@@ -1,0 +1,109 @@
+{
+  "info": {
+    "name": "Ryanair - Airports",
+    "description": "Exported from the public Postman workspace https://www.postman.com/hakkotsu/ryanair/overview (collection 5803268-7bd93177-aa05-4cb2-aed9-ed27e693f83e). All requests are unauthenticated GETs against https://www.ryanair.com.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "origin", "value": "VIE" },
+    { "key": "destination", "value": "TNG" },
+    { "key": "locale", "value": "en-gb" }
+  ],
+  "item": [
+    {
+      "name": "List all active airports (v5)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "https://www.ryanair.com/api/views/locate/5/airports/en/active",
+        "description": "Full airport catalogue: IATA code, name, city, region, country (ISO2/ISO3, currency, schengen flag), latitude/longitude and IANA timeZone. Use this as the offline airport master table."
+      }
+    },
+    {
+      "name": "List all active airports (v3)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "https://www.ryanair.com/api/views/locate/3/airports/en/active",
+        "description": "Older shape of the airport catalogue. v5 is preferred."
+      }
+    },
+    {
+      "name": "List all nearby airports",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "https://www.ryanair.com/api/geoloc/v5/nearbyAirports?market={{locale}}",
+        "description": "Airports near the caller's IP, ordered by proximity."
+      }
+    },
+    {
+      "name": "Get destinations from specific airport",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "https://www.ryanair.com/api/views/locate/searchWidget/routes/en/airport/{{origin}}",
+        "description": "Every route served from {{origin}}. Returns an array of objects with arrivalAirport (full airport object incl. coordinates and timeZone), recent flag, seasonal flag, operator and tags. This is the edge list of the Ryanair route graph."
+      }
+    },
+    {
+      "name": "Get general info about airport",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "https://www.ryanair.com/api/views/locate/5/airports/en/{{origin}}",
+        "description": "Details for a single airport."
+      }
+    },
+    {
+      "name": "Get flight schedules for specific airport",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "https://www.ryanair.com/api/timtbl/3/schedules/{{origin}}/periods",
+        "description": "Published schedule periods (first/last bookable month) for an airport."
+      }
+    },
+    {
+      "name": "Get closest airport based on request IP",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "https://www.ryanair.com/api/geoloc/v5/defaultAirport?market={{locale}}"
+      }
+    },
+    {
+      "name": "List all operating countries",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "https://www.ryanair.com/api/views/locate/3/countries/en",
+        "description": "Country list with ISO codes. Needed to support 'fly me to <country>' searches that fan out over every airport in that country."
+      }
+    },
+    {
+      "name": "Private",
+      "description": "Endpoints the workspace author flagged as internal/undocumented. They work without auth but are more likely to change.",
+      "item": [
+        {
+          "name": "Search for an airport (autocomplete)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "https://www.ryanair.com/api/locate/v1/autocomplete/airports?market=en-gb&phrase={{origin}}",
+            "description": "Type-ahead airport search by free text phrase."
+          }
+        },
+        {
+          "name": "List available destinations between airports",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "https://www.ryanair.com/api/locate/v1/autocomplete/routes?arrivalPhrase={{destination}}&departurePhrase={{origin}}&market={{locale}}",
+            "description": "Route lookup by free text on both ends."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+# Runtime fare/route cache — regenerated on first search, and it holds a snapshot
+# of a third party's pricing data. Never commit it.
+app/.cache/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Dependencies (the app has none today, but keep this honest if that changes)
+node_modules/
+package-lock.json.bak
+
+# Logs and scratch output
+*.log
+npm-debug.log*
+*.sse
+*.tmp
+scratch/
+
+# Secrets — nothing here uses them, and nothing here should start
+.env
+.env.*
+*.pem
+*.key
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

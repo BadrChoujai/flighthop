@@ -1,0 +1,744 @@
+<title>Flighthop</title>
+<style>
+  :root {
+    color-scheme: light;
+    --ground: #eef2f3;
+    --surface: #ffffff;
+    --surface-2: #e6ecee;
+    --line: #ccd9dc;
+    --line-soft: #dde5e7;
+    --ink: #0e1a1e;
+    --ink-2: #38494f;
+    --muted: #6a7d83;
+    --accent: #0f8092;
+    --accent-soft: #d6eef1;
+    --wait: #a86c15;
+    --wait-soft: #f7e7cd;
+    --good: #1d7a5d;
+    --good-soft: #d5ece4;
+    --risk: #ab3c2b;
+    --risk-soft: #f7ded9;
+    --shadow: 0 1px 2px rgba(14,26,30,.06), 0 10px 26px -14px rgba(14,26,30,.22);
+    --sans: "Segoe UI Variable Text", "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --display: "Segoe UI Variable Display", "Segoe UI Semibold", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    --mono: "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, "SF Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground: #0a1215;
+      --surface: #101c20;
+      --surface-2: #16252a;
+      --line: #263a40;
+      --line-soft: #1b2c31;
+      --ink: #e2ecee;
+      --ink-2: #b3c6ca;
+      --muted: #7d9299;
+      --accent: #3cc4d4;
+      --accent-soft: #0f333a;
+      --wait: #e2a54a;
+      --wait-soft: #33260f;
+      --good: #47b791;
+      --good-soft: #10312a;
+      --risk: #e0705c;
+      --risk-soft: #341a1a;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 12px 32px -16px rgba(0,0,0,.85);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #0a1215;
+    --surface: #101c20;
+    --surface-2: #16252a;
+    --line: #263a40;
+    --line-soft: #1b2c31;
+    --ink: #e2ecee;
+    --ink-2: #b3c6ca;
+    --muted: #7d9299;
+    --accent: #3cc4d4;
+    --accent-soft: #0f333a;
+    --wait: #e2a54a;
+    --wait-soft: #33260f;
+    --good: #47b791;
+    --good-soft: #10312a;
+    --risk: #e0705c;
+    --risk-soft: #341a1a;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 12px 32px -16px rgba(0,0,0,.85);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px 120px; }
+  .col { max-width: 68ch; }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    padding: 54px 0 0;
+  }
+  .brandline { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .brand {
+    font-family: var(--display);
+    font-size: clamp(38px, 6vw, 58px);
+    font-weight: 700;
+    letter-spacing: -.03em;
+    margin: 0;
+    line-height: 1;
+  }
+  .brand .hop { color: var(--accent); }
+  .tag {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 4px 8px;
+  }
+  .thesis {
+    font-family: var(--display);
+    font-size: clamp(19px, 2.4vw, 24px);
+    line-height: 1.42;
+    font-weight: 400;
+    color: var(--ink-2);
+    max-width: 46ch;
+    margin: 22px 0 34px;
+    text-wrap: balance;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    border-top: 1px solid var(--line-soft);
+  }
+  .stat { padding: 18px 20px 20px; border-right: 1px solid var(--line-soft); }
+  .stat:last-child { border-right: 0; }
+  .stat b {
+    display: block;
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -.02em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat span { font-size: 13px; color: var(--muted); }
+
+  /* ---------- sections ---------- */
+  section { padding-top: 72px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h2 {
+    font-family: var(--display);
+    font-size: clamp(26px, 3.4vw, 34px);
+    font-weight: 650;
+    letter-spacing: -.022em;
+    line-height: 1.2;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 650;
+    letter-spacing: -.01em;
+    margin: 34px 0 8px;
+  }
+  p { margin: 0 0 16px; color: var(--ink-2); }
+  .lede { color: var(--ink); font-size: 17.5px; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  code {
+    font-family: var(--mono);
+    font-size: .87em;
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--ink);
+    word-break: break-word;
+  }
+  strong { color: var(--ink); font-weight: 640; }
+
+  .rule { height: 1px; background: var(--line); border: 0; margin: 0; }
+
+  /* ---------- panel: a framed "screen" ---------- */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin: 22px 0;
+  }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--surface-2);
+  }
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .panel-body { padding: 18px 16px; }
+  .caption {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin: -8px 0 26px;
+  }
+
+  /* ---------- itinerary rows ---------- */
+  .itin {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .itin + .itin { margin-top: 2px; }
+  .itin:hover { background: var(--surface-2); border-color: var(--line-soft); }
+  .itin.dim { opacity: .3; }
+  .price {
+    font-family: var(--mono);
+    font-size: 21px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+  }
+  .price small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+
+  .track { display: grid; gap: 7px; }
+  .bars { display: flex; height: 26px; align-items: stretch; border-radius: 4px; overflow: hidden; }
+  .seg { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; }
+  .seg-fly { background: var(--accent); color: var(--surface); }
+  .seg-wait {
+    background: var(--wait-soft);
+    color: var(--wait);
+    background-image: repeating-linear-gradient(-45deg, transparent 0 5px, rgba(128,128,128,.14) 5px 10px);
+  }
+  .seg b {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    padding: 0 6px;
+  }
+  .seg-fly b { color: #ffffff; }
+  :root[data-theme="dark"] .seg-fly b { color: #06171b; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .seg-fly b { color: #06171b; }
+  }
+  .legs {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    flex-wrap: wrap;
+  }
+  .legs b { color: var(--ink-2); font-weight: 600; }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .chip::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .chip-good { background: var(--good-soft); color: var(--good); }
+  .chip-tight { background: var(--wait-soft); color: var(--wait); }
+  .chip-risk { background: var(--risk-soft); color: var(--risk); }
+
+  /* ---------- slider ---------- */
+  .control {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 13.5px;
+    color: var(--ink-2);
+  }
+  .control label { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  input[type="range"] { accent-color: var(--accent); width: 190px; }
+  .readout { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  /* ---------- generic grids ---------- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(238px, 1fr)); gap: 1px; background: var(--line-soft); border: 1px solid var(--line-soft); border-radius: 10px; overflow: hidden; margin: 24px 0; }
+  .card { background: var(--surface); padding: 20px 18px; }
+  .card h4 { font-family: var(--display); font-size: 15.5px; font-weight: 650; margin: 0 0 6px; letter-spacing: -.008em; }
+  .card p { font-size: 14px; margin: 0; line-height: 1.55; }
+  .card .src { display: block; margin-top: 10px; font-family: var(--mono); font-size: 11px; color: var(--muted); word-break: break-all; }
+
+  .tbl { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  .tbl th, .tbl td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  .tbl th { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  .tbl td:first-child { white-space: nowrap; }
+  .scroll { overflow-x: auto; }
+
+  ul.clean { margin: 0 0 16px; padding-left: 18px; color: var(--ink-2); }
+  ul.clean li { margin-bottom: 7px; }
+
+  /* ---------- release phases ---------- */
+  .phase { display: grid; grid-template-columns: 74px 1fr; gap: 20px; padding: 22px 0; border-top: 1px solid var(--line-soft); }
+  .phase-tag { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: .1em; color: var(--accent); padding-top: 3px; }
+  .phase h3 { margin: 0 0 6px; }
+  .phase ul { margin: 8px 0 0; }
+
+  /* ---------- palette ---------- */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 22px 0; }
+  .sw { border: 1px solid var(--line-soft); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .sw-chip { height: 60px; }
+  .sw-meta { padding: 9px 11px 11px; }
+  .sw-meta b { display: block; font-size: 13px; font-weight: 640; }
+  .sw-meta span { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .specimen { display: grid; gap: 14px; }
+  .spec-row { display: grid; grid-template-columns: 128px 1fr; gap: 18px; align-items: baseline; padding-bottom: 12px; border-bottom: 1px solid var(--line-soft); }
+  .spec-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+
+  /* ---------- month heat map ---------- */
+  .month { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; max-width: 480px; }
+  .dow { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-align: center; padding-bottom: 2px; }
+  .day {
+    aspect-ratio: 1 / .82;
+    border-radius: 5px;
+    border: 1px solid var(--line-soft);
+    background: var(--surface-2);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 5px 6px;
+    cursor: default;
+  }
+  .day .n { font-family: var(--mono); font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .day .p { font-family: var(--mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .day.best { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* ---------- mock search bar ---------- */
+  .searchbar { display: grid; grid-template-columns: 1fr 1fr 1.15fr auto; gap: 1px; background: var(--line-soft); border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .field { background: var(--surface); padding: 11px 14px; min-width: 0; }
+  .field .k { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); display: block; }
+  .field .v { font-size: 15px; color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .field .v em { font-style: normal; color: var(--muted); font-weight: 400; }
+  .go { background: var(--accent); color: #ffffff; display: flex; align-items: center; padding: 0 22px; font-weight: 640; font-size: 15px; }
+  :root[data-theme="dark"] .go { color: #06171b; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .go { color: #06171b; } }
+
+  .anno { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 16px; }
+  .anno div { font-size: 13.5px; color: var(--ink-2); border-left: 2px solid var(--accent); padding-left: 11px; line-height: 1.5; }
+  .anno b { display: block; font-size: 12px; font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+
+  .states { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .state { border: 1px solid var(--line-soft); border-radius: 8px; padding: 14px; background: var(--surface); }
+  .state b { display: block; font-size: 13.5px; margin-bottom: 4px; }
+  .state p { font-size: 13.5px; margin: 0; }
+  .skel { height: 9px; border-radius: 3px; background: var(--surface-2); margin-bottom: 7px; }
+  .skel.w70 { width: 70%; } .skel.w45 { width: 45%; }
+
+  footer { margin-top: 80px; padding-top: 26px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--muted); }
+
+  @media (max-width: 720px) {
+    .itin { grid-template-columns: 1fr; gap: 10px; }
+    .searchbar { grid-template-columns: 1fr 1fr; }
+    .go { padding: 12px 22px; justify-content: center; grid-column: span 2; }
+    .phase { grid-template-columns: 1fr; gap: 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="masthead">
+  <div class="wrap">
+    <div class="brandline">
+      <h1 class="brand">Flight<span class="hop">hop</span></h1>
+      <span class="tag">Product &amp; interface plan</span>
+    </div>
+    <p class="thesis">Ryanair sells point-to-point tickets, so it tells you Vienna&nbsp;→&nbsp;Tangier is impossible. The network connects those cities eleven different ways. Flighthop searches the route graph instead of the route list.</p>
+    <div class="stats">
+      <div class="stat"><b>14</b><span>hubs connecting VIE to TNG</span></div>
+      <div class="stat"><b>145</b><span>valid itineraries in September</span></div>
+      <div class="stat"><b>€35</b><span>cheapest, vs. no result on ryanair.com</span></div>
+      <div class="stat"><b>2</b><span>API calls to price a whole month</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <section id="demo">
+    <p class="eyebrow">The core screen</p>
+    <h2>One search, every way through</h2>
+    <p class="col lede">This is real output from the working prototype — Vienna to Tangier, September 2026. Drag the minimum layover to see the shape of the trade: the cheapest itinerary is not the one most people want.</p>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">VIE → TNG · Sep 2026 · 1 stop</span>
+        <div class="control">
+          <label for="lay">Min layover</label>
+          <input id="lay" type="range" min="2" max="8" step="0.5" value="2" />
+          <span class="readout" id="layOut">2.0 h</span>
+        </div>
+      </div>
+      <div class="panel-body" id="itins"></div>
+    </div>
+    <p class="caption">Bar width is real elapsed time. Solid = in the air, hatched = waiting landside. Times are shown in each airport's own clock; the layover is computed in UTC, which is the only way to get Madrid 13:10 → Tangier 12:40 right.</p>
+  </section>
+
+  <section id="why">
+    <p class="eyebrow">Why it exists</p>
+    <h2>Three things no flight site will do for you</h2>
+    <div class="cards">
+      <div class="card">
+        <h4>Route graph, not route list</h4>
+        <p>Intersect everything flying out of your origin with everything flying into your destination. Fourteen hubs appear for a pair the airline calls unconnected.</p>
+        <span class="src">views/locate/searchWidget/routes</span>
+      </div>
+      <div class="card">
+        <h4>A month in one request</h4>
+        <p>One call returns thirty days of prices with departure and arrival times attached. Scanning a candidate hub costs two requests, not sixty.</p>
+        <span class="src">farfnd/v4/oneWayFares/…/cheapestPerDay</span>
+      </div>
+      <div class="card">
+        <h4>Comfort priced in euros</h4>
+        <p>A €35 fare with a seven-hour wait and a 05:45 alarm loses to €42 with a three-hour wait. Ranking says so out of the box.</p>
+        <span class="src">scoring, not an endpoint</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="cases">
+    <p class="eyebrow">Use cases</p>
+    <h2>What people will actually type</h2>
+    <p class="col">Six searches, each mapped to the endpoint that answers it. Every one of these is verified working against the live API.</p>
+    <div class="panel">
+      <div class="panel-body scroll">
+        <table class="tbl">
+          <thead>
+            <tr><th>The search</th><th>What it returns</th><th>Powered by</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Vienna → Tangier</strong><br /><span style="color:var(--muted)">no direct flight exists</span></td>
+              <td>Ranked self-connect itineraries with layover, total time and risk.</td>
+              <td><code>routes</code> + <code>cheapestPerDay</code></td>
+            </tr>
+            <tr>
+              <td><strong>Vienna → Morocco</strong></td>
+              <td>Every airport in the country searched at once; the cheapest way into the country, not just into one city.</td>
+              <td><code>locate/5/airports</code> country fan-out</td>
+            </tr>
+            <tr>
+              <td><strong>Anywhere under €40</strong></td>
+              <td>46 destinations from Vienna in September, cheapest first, with flight numbers.</td>
+              <td><code>farfnd/v4/oneWayFares</code></td>
+            </tr>
+            <tr>
+              <td><strong>Anywhere warm, leaving after 09:00</strong></td>
+              <td>Same list, filtered server-side by departure time window and country.</td>
+              <td><code>outboundDepartureTimeFrom/To</code></td>
+            </tr>
+            <tr>
+              <td><strong>When is this cheapest?</strong></td>
+              <td>A month of best-per-day prices for the whole itinerary, connections included.</td>
+              <td>one month scan per leg</td>
+            </tr>
+            <tr>
+              <td><strong>Tell me if it drops</strong></td>
+              <td>Saved search re-run nightly. The API returns the previous price, so a drop is detectable without keeping history.</td>
+              <td><code>previousPrice</code>, <code>priceUpdated</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="month">
+    <p class="eyebrow">Flexible dates</p>
+    <h2>The month view</h2>
+    <p class="col">Real September 2026 data: the best one-stop Vienna→Tangier price for each departure day, connections priced end to end. The spread runs €35 to €220 — flexibility is worth more than any booking trick.</p>
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">September 2026 · best price per departure day</span><span class="panel-title" id="monthLegend">cheap → expensive</span></div>
+      <div class="panel-body"><div class="month" id="monthGrid"></div></div>
+    </div>
+    <p class="caption">Hover a day for the hub and the wait. Cheapest days get an outline, not a different hue — colour already carries price, and stacking two meanings on one channel is how heat maps become unreadable.</p>
+  </section>
+
+  <section id="features">
+    <p class="eyebrow">Scope</p>
+    <h2>What ships, and in what order</h2>
+    <p class="col">The phases are a real sequence: each one is only worth building once the previous one is trustworthy. Shipping alerts before the layover maths is correct just means notifying people about connections they will miss.</p>
+
+    <div class="phase">
+      <div class="phase-tag">V1</div>
+      <div>
+        <h3>The impossible route</h3>
+        <p>One origin, one destination — airport or country — a date range, one stop. This alone is a product.</p>
+        <ul class="clean">
+          <li>Self-connect search with UTC-correct layover maths</li>
+          <li>Airport <em>or</em> country as destination</li>
+          <li>Ranking by price plus comfort, with the weights exposed as sliders</li>
+          <li>Per-leg deep links into Ryanair's own booking flow</li>
+          <li>Month view for flexible dates</li>
+          <li>A plain-language warning that two tickets are two tickets</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-tag">V2</div>
+      <div>
+        <h3>Discovery and confidence</h3>
+        <p>Turn a search tool into somewhere to browse, and make the risky results honest.</p>
+        <ul class="clean">
+          <li><strong>Anywhere under €X</strong>, filtered by country, region and departure time</li>
+          <li><strong>Risk badge</strong>: layover length, bag re-check, terminal change, border crossing, last-flight-of-the-day</li>
+          <li><strong>Backup flight</strong>: for tight connections, the next departure and what rebooking costs</li>
+          <li><strong>Weekend break</strong> mode built on the round-trip endpoint</li>
+          <li>Bag and seat costs added per leg, so the total is comparable to a legacy fare</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-tag">V3</div>
+      <div>
+        <h3>Coming back to it</h3>
+        <ul class="clean">
+          <li>Saved searches with price-drop and new-route alerts</li>
+          <li>Two-stop routing, geographically pruned, only when one stop finds nothing</li>
+          <li>Passport-aware filtering — hide hubs the traveller cannot transit</li>
+          <li>Map view of the route graph, because the graph is genuinely fun to explore</li>
+          <li>Second carrier (Wizz, easyJet) — the algorithm never cared which airline</li>
+        </ul>
+      </div>
+    </div>
+    <hr class="rule" />
+  </section>
+
+  <section id="theme">
+    <p class="eyebrow">Visual direction</p>
+    <h2>Night apron</h2>
+    <p class="col">Airline sites shout in primary colours; this one is a tool for reading timetables, so it borrows from the things that already do that well — departure boards, aeronautical charts, transit diagrams. Cool blue-grey neutrals, a single teal that stands for <em>flying</em>, and a sodium amber that stands for <em>waiting</em>. That pairing is the whole interface: every itinerary is teal, amber, teal.</p>
+
+    <div class="swatches">
+      <div class="sw"><div class="sw-chip" style="background:var(--accent)"></div><div class="sw-meta"><b>Nav teal</b><span>#0F8092 · #3CC4D4</span></div></div>
+      <div class="sw"><div class="sw-chip" style="background:var(--wait)"></div><div class="sw-meta"><b>Sodium amber</b><span>#A86C15 · #E2A54A</span></div></div>
+      <div class="sw"><div class="sw-chip" style="background:var(--good)"></div><div class="sw-meta"><b>Comfortable</b><span>#1D7A5D · #47B791</span></div></div>
+      <div class="sw"><div class="sw-chip" style="background:var(--risk)"></div><div class="sw-meta"><b>Risky</b><span>#AB3C2B · #E0705C</span></div></div>
+      <div class="sw"><div class="sw-chip" style="background:var(--ground);border-bottom:1px solid var(--line)"></div><div class="sw-meta"><b>Ground</b><span>#EEF2F3 · #0A1215</span></div></div>
+      <div class="sw"><div class="sw-chip" style="background:var(--ink)"></div><div class="sw-meta"><b>Ink</b><span>#0E1A1E · #E2ECEE</span></div></div>
+    </div>
+
+    <h3>Rules the palette has to follow</h3>
+    <ul class="clean col">
+      <li>Teal is the only accent. Everything clickable is teal; nothing decorative is.</li>
+      <li>Amber is not a second brand colour — it means waiting, and waiting is also the risk axis, which is why the layover bar and the "tight connection" chip share it. That overlap is the point.</li>
+      <li>Green, amber and red never appear alone. Every risk state carries a word as well as a hue, because a colour-blind traveller still has a plane to catch.</li>
+      <li>Neutrals are biased cool, toward the accent. A pure grey next to teal reads as a mistake.</li>
+    </ul>
+
+    <h3>Type</h3>
+    <p class="col">Two voices. Interface text in the platform's own UI face, which is quiet and reads well at small sizes. Everything that is data — times, prices, IATA codes, durations — in a monospace with tabular figures, so digits line up in a column and the eye can scan a page of departures the way it scans a departure board.</p>
+    <div class="panel">
+      <div class="panel-body specimen">
+        <div class="spec-row"><span class="spec-label">Display 34/650</span><span style="font-family:var(--display);font-size:30px;font-weight:650;letter-spacing:-.022em">Vienna to Tangier, eleven ways</span></div>
+        <div class="spec-row"><span class="spec-label">Body 16.5/1.62</span><span>Land at Bergamo 07:10, wait seven hours, fly on at 14:25.</span></div>
+        <div class="spec-row"><span class="spec-label">Data · mono</span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:15px">VIE 05:45 → BGY 07:10 · FR7360 · €16.99</span></div>
+        <div class="spec-row" style="border-bottom:0"><span class="spec-label">Label · mono</span><span class="panel-title">MIN LAYOVER · OVERNIGHT · BAG RE-CHECK</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="ux">
+    <p class="eyebrow">Interface</p>
+    <h2>Three fields, then get out of the way</h2>
+    <p class="col">The search is one line because the interesting decisions happen after the results appear, not before. "Anywhere" and a country name are first-class inputs, not an advanced mode.</p>
+
+    <div class="panel">
+      <div class="panel-body">
+        <div class="searchbar">
+          <div class="field"><span class="k">From</span><span class="v">Vienna <em>VIE</em></span></div>
+          <div class="field"><span class="k">To</span><span class="v">Morocco <em>any airport</em></span></div>
+          <div class="field"><span class="k">When</span><span class="v">Sep 2026 <em>flexible</em></span></div>
+          <div class="go">Search</div>
+        </div>
+        <div class="anno">
+          <div><b>To</b> Accepts an airport, a city, a country, or the word Anywhere. Same field, no mode switch.</div>
+          <div><b>When</b> A whole month is a valid answer. Flexibility is the single biggest lever on price, so the UI never forces an exact date.</div>
+          <div><b>Stops</b> Not in the search bar. Default to one stop, offer two only when one finds nothing under budget.</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Anatomy of a result</h3>
+    <ul class="clean col">
+      <li><strong>Price first, on the left</strong>, in mono at 21px — it is what the eye goes to, and column alignment lets you compare down the list without reading.</li>
+      <li><strong>The timeline is the result</strong>, not an illustration of it. Bar width is elapsed time, so a nine-hour trip is visibly longer than a six-hour one before any number is read.</li>
+      <li><strong>The gap is drawn, not described.</strong> Hatched amber says "you are sitting in a terminal" faster than "7h 18m layover" ever will.</li>
+      <li><strong>Both clocks are shown.</strong> Local time at each airport, because that is what the boarding pass says, with the honest total computed underneath in UTC.</li>
+      <li><strong>Risk is a chip with a word in it</strong> — <span class="chip chip-good">comfortable</span> <span class="chip chip-tight">tight</span> <span class="chip chip-risk">risky</span> — placed next to the gap it describes.</li>
+      <li><strong>Booking is two buttons, deliberately.</strong> Two tickets means two transactions; hiding that behind one "Book" button would be a lie with a €200 consequence.</li>
+    </ul>
+
+    <h3>Filters live beside the results, not in a modal</h3>
+    <p class="col">Every filter re-ranks the list in place. The sliders that matter — minimum layover, maximum price, latest arrival — are the ones from the ranking formula, so the user is tuning the same knobs the algorithm uses. No hidden second model.</p>
+
+    <h3>The states that decide whether it feels good</h3>
+    <div class="states">
+      <div class="state">
+        <b>Searching</b>
+        <div class="skel"></div><div class="skel w70"></div><div class="skel w45"></div>
+        <p style="margin-top:8px">A graph search takes seconds. Show hub names as they resolve — "checking Bergamo, Barcelona…" — so the wait reads as work, not as a hang.</p>
+      </div>
+      <div class="state">
+        <b>Nothing under your budget</b>
+        <p>Never a dead end. Offer the two nearest exits: the cheapest result that does exist, and the same trip with two stops allowed.</p>
+      </div>
+      <div class="state">
+        <b>Route has vanished</b>
+        <p>Seasonal routes disappear mid-planning. Say which leg died and what it costs now, then re-run the search around it.</p>
+      </div>
+      <div class="state">
+        <b>Self-transfer notice</b>
+        <p>Shown once per session, near the booking buttons, in plain words: if the first flight is late, nobody owes you the second one.</p>
+      </div>
+    </div>
+
+    <h3>On a phone</h3>
+    <p class="col">The timeline survives the narrow column — it is the one element worth keeping at full width. Price moves above the bar, the leg details collapse to origin and destination with times, and the filter rail becomes a bottom sheet that keeps the result list visible behind it while you drag.</p>
+  </section>
+
+  <section id="build">
+    <p class="eyebrow">Build</p>
+    <h2>How it holds together</h2>
+    <p class="col">The fare endpoints refuse browser calls from another origin, so the search runs on the server. That is also where the cache belongs, and the cache is most of the architecture.</p>
+    <div class="scroll">
+      <table class="tbl">
+        <thead><tr><th>Layer</th><th>Choice</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td><strong>App</strong></td><td>Next.js or SvelteKit</td><td>Server routes double as the proxy the CORS rules force you to have.</td></tr>
+          <tr><td><strong>Cache</strong></td><td>Postgres or SQLite, keyed <code>(from, to, month)</code></td><td>Airport table: weeks. Route graph: days. Month fares: hours. Live search then answers in under a second.</td></tr>
+          <tr><td><strong>Worker</strong></td><td>Background refresh of popular routes</td><td>Also powers price-drop alerts — the API hands you the previous price for free.</td></tr>
+          <tr><td><strong>Manners</strong></td><td>Concurrency ≤ 4, backoff on 403/429</td><td>Undocumented endpoints on a real airline's infrastructure. Two of them already return 409 and 403 to naive callers.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Before it becomes a business</h3>
+    <p class="col">Ryanair has litigated hard against automated access to its fares. Unauthenticated endpoints and public data do not override the site terms, and personal tooling sits in a very different position from a commercial product. If this ever charges money, the honest routes are a distribution agreement or a licensed aggregator feed — not scaling this quietly.</p>
+  </section>
+
+  <footer>
+    Flighthop — product and interface plan. Figures verified against the live Ryanair endpoints on 20 August 2026: 14 hubs, 145 one-stop itineraries, best fare €35 Vienna→Tangier via Bergamo.
+  </footer>
+</div>
+
+<script>
+  const itineraries = [
+    { price: 35, day: "Tue 9 Sep",  hub: "BGY", hubName: "Bergamo",   l1: 1.42, wait: 7.3, l2: 2.83, a: "VIE 05:45", b: "BGY 07:10", c: "BGY 14:25", d: "TNG 16:15" },
+    { price: 42, day: "Wed 30 Sep", hub: "BCN", hubName: "Barcelona", l1: 2.42, wait: 3.3, l2: 1.00, a: "VIE 06:15", b: "BCN 08:40", c: "BCN 12:00", d: "TNG 12:00" },
+    { price: 48, day: "Mon 28 Sep", hub: "CRL", hubName: "Charleroi", l1: 1.75, wait: 6.1, l2: 2.00, a: "VIE 09:25", b: "CRL 11:10", c: "CRL 17:15", d: "TNG 18:15" },
+    { price: 48, day: "Tue 29 Sep", hub: "BCN", hubName: "Barcelona", l1: 2.42, wait: 2.8, l2: 1.00, a: "VIE 05:45", b: "BCN 08:10", c: "BCN 11:00", d: "TNG 11:00" },
+    { price: 49, day: "Thu 24 Sep", hub: "BGY", hubName: "Bergamo",   l1: 1.42, wait: 4.2, l2: 1.83, a: "VIE 06:40", b: "BGY 08:05", c: "BGY 12:15", d: "TNG 13:05" },
+    { price: 66, day: "Tue 29 Sep", hub: "MAD", hubName: "Madrid",    l1: 3.17, wait: 3.6, l2: 0.50, a: "VIE 06:25", b: "MAD 09:35", c: "MAD 13:10", d: "TNG 12:40" }
+  ];
+
+  const risk = (w) => w < 3 ? ["chip-risk", "risky"] : w < 4.5 ? ["chip-tight", "tight"] : ["chip-good", "comfortable"];
+  const hrs = (h) => h >= 1 ? `${Math.floor(h)}h ${String(Math.round((h % 1) * 60)).padStart(2, "0")}m` : `${Math.round(h * 60)}m`;
+
+  const maxSpan = Math.max(...itineraries.map(i => i.l1 + i.wait + i.l2));
+
+  function renderItins(min) {
+    document.getElementById("itins").innerHTML = itineraries.map(i => {
+      const total = i.l1 + i.wait + i.l2;
+      const scale = (v) => (v / maxSpan) * 100;
+      const [cls, word] = risk(i.wait);
+      const dim = i.wait < min ? " dim" : "";
+      return `<div class="itin${dim}">
+        <div class="price">€${i.price}<small>${i.day}</small></div>
+        <div class="track">
+          <div class="bars" style="width:${scale(total)}%">
+            <div class="seg seg-fly" style="flex:${i.l1}"><b>${i.l1 >= 1.6 ? hrs(i.l1) : ""}</b></div>
+            <div class="seg seg-wait" style="flex:${i.wait}"><b>${hrs(i.wait)} in ${i.hubName}</b></div>
+            <div class="seg seg-fly" style="flex:${i.l2}"><b>${i.l2 >= 1.6 ? hrs(i.l2) : ""}</b></div>
+          </div>
+          <div class="legs">
+            <span><b>${i.a}</b> → <b>${i.b}</b> &nbsp;·&nbsp; <b>${i.c}</b> → <b>${i.d}</b></span>
+            <span><span class="chip ${cls}">${word}</span> &nbsp; ${hrs(total)} door to door</span>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  const slider = document.getElementById("lay");
+  slider.addEventListener("input", () => {
+    document.getElementById("layOut").textContent = Number(slider.value).toFixed(1) + " h";
+    renderItins(Number(slider.value));
+  });
+  renderItins(2);
+
+  const month = {"1":62,"2":55,"3":109,"4":138,"5":100,"6":220,"7":104,"8":48,"9":35,"10":85,"11":149,"12":59,"13":123,"14":87,"15":61,"16":55,"17":92,"18":111,"19":88,"20":87,"21":74,"22":43,"23":35,"24":49,"25":86,"26":84,"27":77,"28":48,"29":48,"30":42};
+  const hubOf = {"1":"BGY 17.3h","2":"BGY 7.3h","3":"BCN 14.3h","4":"MRS 17.8h","5":"AGA 17.3h","6":"STN 9.3h","7":"BCN 5.1h","8":"BGY 10.7h","9":"BGY 7.3h","10":"BGY 4.2h","11":"AGP 6.8h","12":"BVA 12.0h","13":"STN 9.3h","14":"CRL 6.1h","15":"BGY 17.3h","16":"BGY 14.3h","17":"BCN 7.5h","18":"AGP 6.8h","19":"BCN 7.3h","20":"STN 9.3h","21":"BCN 4.9h","22":"BGY 17.3h","23":"BGY 7.3h","24":"BGY 4.2h","25":"AGP 6.8h","26":"BVA 12.0h","27":"STN 9.3h","28":"CRL 6.1h","29":"BCN 2.8h","30":"BCN 3.3h"};
+
+  const prices = Object.values(month);
+  const lo = Math.min(...prices), hi = Math.max(...prices);
+  const grid = document.getElementById("monthGrid");
+
+  ["M","T","W","T","F","S","S"].forEach(d => {
+    const el = document.createElement("div");
+    el.className = "dow"; el.textContent = d; grid.appendChild(el);
+  });
+  // 1 September 2026 is a Tuesday
+  for (let i = 0; i < 1; i++) grid.appendChild(document.createElement("div"));
+
+  for (let d = 1; d <= 30; d++) {
+    const p = month[d];
+    const t = Math.pow((p - lo) / (hi - lo), 0.6);
+    const cell = document.createElement("div");
+    cell.className = "day" + (p === lo ? " best" : "");
+    cell.style.background = `color-mix(in oklab, var(--accent) ${Math.round((1 - t) * 42)}%, var(--surface-2))`;
+    cell.style.borderColor = p === lo ? "transparent" : "var(--line-soft)";
+    cell.title = `${d} Sep · €${p} · via ${hubOf[d]} wait`;
+    cell.innerHTML = `<span class="n">${d}</span><span class="p">€${p}</span>`;
+    grid.appendChild(cell);
+  }
+  document.getElementById("monthLegend").textContent = `€${lo} — €${hi}`;
+</script>

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flighthop</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>%E2%9C%88%EF%B8%8F</text></svg>" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+<header>
+  <div class="wrap headrow">
+    <h1 class="brand">Flight<span class="hop">hop</span></h1>
+
+    <form class="searchbar" id="searchForm">
+      <div class="field picker" id="fromPicker">
+        <label for="from">From</label>
+        <input id="from" placeholder="City or airport" data-value="VIE" required />
+      </div>
+      <div class="field picker" id="toPicker">
+        <label for="to">To</label>
+        <input id="to" placeholder="Anywhere, or a country" data-value="TNG" required />
+      </div>
+      <div class="field range" id="rangePicker">
+        <label>When</label>
+        <button type="button" class="range-btn"><span class="range-value">Pick dates</span></button>
+      </div>
+      <button class="go" type="submit" id="goBtn">Search</button>
+    </form>
+
+    <form class="searchbar hidden" id="exploreForm">
+      <div class="field picker" id="xfromPicker">
+        <label for="xfrom">From</label>
+        <input id="xfrom" placeholder="City or airport" data-value="VIE" required />
+      </div>
+      <div class="field picker" id="xcountryPicker">
+        <label for="xcountry">To</label>
+        <input id="xcountry" placeholder="Anywhere" />
+      </div>
+      <div class="field range" id="xrangePicker">
+        <label>When</label>
+        <button type="button" class="range-btn"><span class="range-value">Pick dates</span></button>
+      </div>
+      <button class="go" type="submit">Find</button>
+    </form>
+
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-search" aria-selected="true">Connect me</button>
+      <button role="tab" id="tab-explore" aria-selected="false">Anywhere under</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ============ SEARCH ============ -->
+  <div id="view-search">
+    <div class="layout">
+      <div class="rail">
+        <section>
+          <h3>Connection</h3>
+          <div class="ctrl">
+            <div class="ctrl-head"><span>Minimum layover</span><b id="minLayoutOut">2.0 h</b></div>
+            <input type="range" id="minLayover" min="1" max="8" step="0.5" value="2" />
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-head"><span>Maximum layover</span><b id="maxLayoutOut">18 h</b></div>
+            <input type="range" id="maxLayover" min="3" max="24" step="1" value="18" />
+          </div>
+          <div class="ctrl">
+            <label class="check"><input type="checkbox" id="noOvernight" /> Hide overnight connections</label>
+          </div>
+        </section>
+
+        <section>
+          <h3>Rank by</h3>
+          <div class="seg-toggle" id="sortToggle">
+            <button data-sort="score" aria-pressed="true">Best</button>
+            <button data-sort="price" aria-pressed="false">Cheapest</button>
+            <button data-sort="total" aria-pressed="false">Fastest</button>
+          </div>
+          <div class="ctrl" style="margin-top:15px">
+            <div class="ctrl-head"><span>Cost of a rushed transfer</span><b id="tightOut">€25/h</b></div>
+            <input type="range" id="tightPenalty" min="0" max="60" step="5" value="25" />
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-head"><span>Cost of dead time</span><b id="longOut">€8/h</b></div>
+            <input type="range" id="longPenalty" min="0" max="30" step="1" value="8" />
+          </div>
+        </section>
+
+        <section>
+          <h3>Budget</h3>
+          <div class="ctrl">
+            <div class="ctrl-head"><span>Maximum total</span><b id="maxPriceOut">any</b></div>
+            <input type="range" id="maxPrice" min="0" max="400" step="10" value="0" />
+          </div>
+        </section>
+      </div>
+
+      <div>
+        <div id="monthPanel" class="month-panel hidden">
+          <h3 id="monthTitle">Best price per departure day</h3>
+          <div class="month" id="monthGrid"></div>
+        </div>
+
+        <div class="notice" id="notice" hidden>
+          <span>⚠</span>
+          <div><b>These are two separate tickets.</b> If the first flight is late, nobody owes you the second one or a refund for it. Leave more time than you would on a through ticket, and expect to collect and re-check bags at the connection.</div>
+        </div>
+
+        <div class="resulthead hidden" id="resultHead">
+          <h2 id="resultTitle"></h2>
+          <span id="resultCount"></span>
+        </div>
+
+        <div id="results"></div>
+
+        <div class="state" id="idle">
+          <h3>Where do you want to go?</h3>
+          <p>Try Vienna to Tangier — an airline will tell you that route does not exist.</p>
+        </div>
+
+        <div class="state hidden" id="loading">
+          <h3>Searching the network</h3>
+          <p id="loadingSub">Building the route graph…</p>
+          <div class="bar"><div id="progressBar"></div></div>
+          <div class="progress" id="progressText"></div>
+        </div>
+
+        <div class="state error hidden" id="failure">
+          <h3 id="failTitle">That search did not work</h3>
+          <p id="failMsg"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ EXPLORE ============ -->
+  <div id="view-explore" class="hidden">
+    <div class="layout">
+      <div class="rail">
+        <section>
+          <h3>Limits</h3>
+          <div class="ctrl">
+            <div class="ctrl-head"><span>Maximum fare</span><b id="xmaxOut">€60</b></div>
+            <input type="range" id="xmax" min="10" max="300" step="5" value="60" />
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-head"><span>Not before</span><b id="xafterOut">any</b></div>
+            <input type="range" id="xafter" min="0" max="22" step="1" value="0" />
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-head"><span>Not after</span><b id="xbeforeOut">any</b></div>
+            <input type="range" id="xbefore" min="2" max="24" step="1" value="24" />
+          </div>
+        </section>
+      </div>
+      <div>
+        <div class="resulthead hidden" id="xhead">
+          <h2 id="xtitle"></h2>
+          <span id="xcount"></span>
+        </div>
+        <div class="scroll" id="xresults"></div>
+        <div class="state" id="xidle">
+          <h3>One request, every destination</h3>
+          <p>The whole network out of one airport, ranked by price, with flight numbers.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Flighthop V1 · unofficial, unaffiliated with Ryanair · fares are one adult with cabin bag only
+  </footer>
+</div>
+
+<script src="/app.js" type="module"></script>
+</body>
+</html>

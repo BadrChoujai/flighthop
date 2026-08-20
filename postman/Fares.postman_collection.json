@@ -1,0 +1,24 @@
+{
+  "info": {
+    "name": "Ryanair - Fares",
+    "description": "Exported from the public Postman workspace https://www.postman.com/hakkotsu/ryanair/overview (collection 5803268-e0b97673-4e90-46ae-bc21-c0235e08e106).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "origin", "value": "VIE" },
+    { "key": "destination", "value": "AGP" },
+    { "key": "departDate", "value": "2026-09-01" },
+    { "key": "currency", "value": "EUR" }
+  ],
+  "item": [
+    {
+      "name": "Cheapest flights per day",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "https://www.ryanair.com/api/farfnd/v4/oneWayFares/{{origin}}/{{destination}}/cheapestPerDay?outboundMonthOfDate={{departDate}}&currency={{currency}}",
+        "description": "One call returns a whole month of the route: for each day, the cheapest fare plus its departureDate and arrivalDate (LOCAL time at each airport, no offset in the string) and soldOut/unavailable flags. This is the cheapest way to scan a route; departDate should be the first of the month."
+      }
+    }
+  ]
+}

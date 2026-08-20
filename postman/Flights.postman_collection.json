@@ -1,0 +1,32 @@
+{
+  "info": {
+    "name": "Ryanair - Flights",
+    "description": "Exported from the public Postman workspace https://www.postman.com/hakkotsu/ryanair/overview (collection 5803268-f464ed4f-ca75-41ac-b0d7-e23125821adf).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "origin", "value": "VIE" },
+    { "key": "destination", "value": "AGP" },
+    { "key": "departDate", "value": "2026-09-01" }
+  ],
+  "item": [
+    {
+      "name": "Availability (all flights on a date)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "https://www.ryanair.com/api/booking/v4/en-gb/availability?ADT=1&CHD=0&DateIn=&DateOut={{departDate}}&Destination={{destination}}&Disc=0&INF=0&Origin={{origin}}&TEEN=0&promoCode=&IncludeConnectingFlights=false&FlexDaysBeforeOut=4&FlexDaysOut=2&FlexDaysBeforeIn=2&FlexDaysIn=2&RoundTrip=false&ToUs=AGREED",
+        "description": "Every flight on the date (plus the flex window): flight number, local departure/arrival times, UTC times, duration, fare classes, seats left. Use this when a route has more than one frequency per day and the cheapestPerDay times are not enough. FlexDaysBeforeOut/FlexDaysOut widen the window; ToUs=AGREED is required."
+      }
+    },
+    {
+      "name": "Available dates for a route",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "https://www.ryanair.com/api/farfnd/v4/oneWayFares/{{origin}}/{{destination}}/availabilities",
+        "description": "Array of YYYY-MM-DD strings the route actually operates on. Cheap pre-filter before hitting fare or availability endpoints."
+      }
+    }
+  ]
+}
