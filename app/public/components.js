@@ -224,7 +224,10 @@ export class DateRange {
     this.pop.addEventListener('pointerover', (e) => {
       if (e.pointerType !== 'mouse') return;
       const cell = e.target.closest('[data-day]');
-      if (this.from && !this.to && cell) { this.hover = cell.dataset.day; this.render(); }
+      if (this.from && !this.to && cell) {
+        this.hover = cell.dataset.day;
+        this.paintRange();
+      }
     });
     for (const type of ['mousedown', 'touchstart']) {
       document.addEventListener(type, (e) => {
@@ -297,6 +300,24 @@ export class DateRange {
     if (this.from && this.to) {
       this.button.dispatchEvent(new CustomEvent('rangechange', { bubbles: true }));
       setTimeout(() => this.hide(), 160);
+    }
+  }
+
+  /**
+   * Repaint the selection on the cells that are already there.
+   *
+   * Rebuilding the grid while the pointer is inside it replaces the element
+   * under the cursor between mousedown and mouseup, and a click needs both on
+   * the same element — so hovering used to make the end date unselectable. Touch
+   * hit the same wall via its synthetic mouseover. Nothing is replaced here.
+   */
+  paintRange() {
+    const end = this.to ?? (this.from && this.hover > this.from ? this.hover : null);
+    for (const cell of this.pop.querySelectorAll('[data-day]')) {
+      const key = cell.dataset.day;
+      cell.classList.toggle('start', key === this.from);
+      cell.classList.toggle('end', key === this.to);
+      cell.classList.toggle('between', !!(this.from && end && key > this.from && key < end));
     }
   }
 
