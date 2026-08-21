@@ -761,13 +761,17 @@ function renderMonth() {
   const days = Object.keys(month).sort();
   const grid = $('monthGrid');
   grid.innerHTML = '';
-  if (!days.length) { $('monthPanel').classList.add('hidden'); return; }
+  // A calendar of one day tells you nothing you did not just type into the form.
+  if (days.length <= 1) { $('monthPanel').classList.add('hidden'); return; }
+  $('monthPanel').classList.remove('hidden');
 
   const prices = days.map(d => month[d].price);
   const lo = Math.min(...prices), hi = Math.max(...prices);
   $('monthTitle').textContent = state.pinnedDay
     ? `Showing ${dayName(state.pinnedDay)} only`
-    : `Best price per departure day · ${money(lo, state.result.currency)} to ${money(hi, state.result.currency)}`;
+    : lo === hi
+      ? `Best price per departure day · ${money(lo, state.result.currency)}`
+      : `Best price per departure day · ${money(lo, state.result.currency)} to ${money(hi, state.result.currency)}`;
   $('monthReset').classList.toggle('hidden', !state.pinnedDay);
 
   ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(d => {

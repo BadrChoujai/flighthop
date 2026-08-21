@@ -316,6 +316,8 @@ button.go:disabled { opacity: .55; cursor: default; }
 @keyframes swapspin { from { transform: rotate(0); } to { transform: rotate(180deg); } }
 
 .searchbar.round { grid-template-columns: 1fr 1fr 1fr 1fr auto; }
+/* Room for the swap button, which straddles this field's left edge. */
+#toPicker { padding-left: 26px; }
 
 /* ---------- search panel ----------
    The search belongs with the results it produces, not stranded in the header
@@ -497,6 +499,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; margin: 5px 0 0;
 .seg-toggle button {
   flex: 1; font: inherit; font-size: 12.5px; font-weight: 600; border: 0; cursor: pointer;
   background: transparent; color: var(--muted); padding: 5px 4px; border-radius: 4px;
+  white-space: nowrap;      /* "Round trip" broke across two lines */
 }
 .seg-toggle button[aria-pressed="true"] { background: var(--surface); color: var(--ink); }
 .check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); cursor: pointer; }
