@@ -559,6 +559,16 @@ input[type="range"] { accent-color: var(--accent); width: 100%; margin: 5px 0 0;
 
 .price { font-family: var(--mono); font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .price small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+.price .dest {
+  display: block; margin-top: 3px;
+  font-family: var(--sans); font-size: 14px; font-weight: 650;
+  letter-spacing: -.01em; color: var(--ink); line-height: 1.25;
+}
+.price .dest .code {
+  font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--muted);
+}
+.leg-box .places { font-size: 13px; color: var(--ink); font-weight: 600; margin-bottom: 3px; }
+.leg-box .places .country { color: var(--muted); font-weight: 400; }
 .price .via { color: var(--accent); }
 
 .track { display: grid; gap: 7px; min-width: 0; }

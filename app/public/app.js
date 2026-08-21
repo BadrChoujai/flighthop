@@ -85,6 +85,11 @@ const dayName = (iso) => new Date(iso + 'T12:00:00Z')
 
 function iso(d) { return d.toISOString().slice(0, 10); }
 
+/* An IATA code is only obvious to someone who already knows it. Anywhere a place
+   is named for the first time, name it properly and keep the code alongside. */
+const cityOf = (code) => airports.find(a => a.code === code)?.city ?? code;
+const countryOf = (code) => airports.find(a => a.code === code)?.country ?? '';
+
 /* ---------- pickers ---------- */
 const pickers = {
   from: new PlacePicker($('fromPicker')),
@@ -549,6 +554,7 @@ function barSegments(it, seg) {
     if (wait === undefined) return;
     const hub = leg.to;
     html += seg('seg-wait', wait, [
+      `${hrs(wait)} in ${cityOf(hub)}`,
       `${hrs(wait)} in ${hub}`,
       ...flyLabels(wait),
     ]);
@@ -581,13 +587,19 @@ function card(it, i, maxSpan) {
       : `${flight} &nbsp;·&nbsp; <span class="wait-inline">wait ${hrs(wait)}</span>`;
   }).join(' &nbsp;·&nbsp; ');
 
-  const via = it.kind === 'direct' ? ''
-    : ` · via <span class="via">${it.hubs.join(' · ')}</span>`;
   const tickets = it.kind === 'direct' ? '' :
     `<span class="ticketpill">${it.tickets} tickets</span>`;
 
+  // Where you actually end up. On a country search the destination differs from
+  // card to card, and a bare code does not tell anyone which city they picked.
+  const arrival = it.legs.at(-1).to;
+  const destination = `${cityOf(arrival)} <span class="code">${arrival}</span>`;
+  const via = it.kind === 'direct' ? ''
+    : ` · via <span class="via">${it.hubs.map(cityOf).join(', ')}</span>`;
+
   return `<div class="card ${open ? 'open' : ''}" data-id="${id}" data-i="${i}">
     <div class="price">${money(it.price, it.currency)}
+      <span class="dest">${destination}</span>
       <small>${dayName(it.legs[0].depDate)}${via}</small>
     </div>
     <div class="track">
@@ -606,6 +618,7 @@ function detail(it) {
     <div class="leg-box">
       <span class="k">${it.kind === 'direct' ? 'Flight' : `Leg ${n + 1}`}</span>
       <div class="route">${l.from} ${l.depLocal} → ${l.to} ${l.arrLocal}</div>
+      <div class="places">${cityOf(l.from)} → ${cityOf(l.to)}<span class="country">, ${countryOf(l.to)}</span></div>
       <div class="sub">${dayName(l.depDate)} · ${hrs(l.duration)} · ${money(l.price, l.currency)}${l.flight ? ` · ${l.flight}` : ''}</div>
       <a class="book" href="${l.book}" target="_blank" rel="noopener">Book this leg on Ryanair</a>
     </div>`).join('');
