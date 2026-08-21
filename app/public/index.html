@@ -49,6 +49,8 @@
       <button role="tab" id="tab-search" aria-selected="true">Connect me</button>
       <button role="tab" id="tab-explore" aria-selected="false">Anywhere under</button>
     </div>
+
+    <button class="infolink" id="tab-info" aria-pressed="false">How it works</button>
   </div>
 </header>
 
@@ -168,6 +170,209 @@
           <p>The whole network out of one airport, ranked by price, with flight numbers.</p>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ============ HOW IT WORKS ============ -->
+  <div id="view-info" class="hidden">
+    <div class="info">
+
+      <section>
+        <h2>What this actually does</h2>
+        <p>Airlines sell you routes they have already decided exist. Ryanair flies from Vienna,
+          and it flies to Tangier, but it does not sell Vienna&nbsp;→&nbsp;Tangier — so searching
+          for it returns nothing.</p>
+        <p>Flighthop reads the network as a map rather than a list. It finds every airport the
+          airline flies to from where you are <em>and</em> flies from to where you want to be,
+          then pairs up flights whose timings actually work and prices the pair.</p>
+        <p class="callout"><strong>The catch, stated plainly:</strong> these are two separate
+          tickets. The airline sells them as unrelated journeys and treats them that way. If the
+          first flight is late and you miss the second, nobody owes you a seat, a refund, or a
+          hotel. That risk is why these trips are cheap — and it is what the tags below measure.</p>
+      </section>
+
+      <section id="tags">
+        <h2>What the tags mean</h2>
+        <p>Every connection gets one tag, based on how long you have between landing and taking
+          off again. The thresholds are deliberately more cautious than an airline's own minimum
+          connection time, because on a single ticket the airline re-books you and here nobody
+          does.</p>
+
+        <div class="tagdoc">
+          <div class="tagdoc-row">
+            <span class="chip chip-comfortable">comfortable</span>
+            <div>
+              <b>4 hours 30 minutes or more</b>
+              <p>Time to land, wait for a bag, walk to departures, queue at check-in, clear
+                security again, and still sit down before boarding. An hour or two of delay on
+                the first flight does not cost you the second.</p>
+            </div>
+          </div>
+
+          <div class="tagdoc-row">
+            <span class="chip chip-tight">tight</span>
+            <div>
+              <b>3 to 4 hours 30 minutes</b>
+              <p>Workable, and usually fine — but it assumes nothing goes wrong. No long queue at
+                passport control, no bag that takes forty minutes on the belt, no gate at the far
+                end of the terminal. Reasonable with cabin baggage. Less so with a checked bag.</p>
+            </div>
+          </div>
+
+          <div class="tagdoc-row">
+            <span class="chip chip-risky">risky</span>
+            <div>
+              <b>Under 3 hours</b>
+              <p>One thing going wrong loses you the second flight, and the money you paid for it.
+                Shown because it may be exactly what you want on a cabin-bag-only trip you could
+                afford to redo — not because it is advisable. Check whether a later flight exists
+                before booking one; the trip detail says so explicitly.</p>
+            </div>
+          </div>
+
+          <div class="tagdoc-row">
+            <span class="chip chip-direct">direct</span>
+            <div>
+              <b>No connection at all</b>
+              <p>One flight, one ticket, none of the above applies. When a direct flight exists it
+                is shown alongside the connections, so you can see what the saving is actually
+                worth.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>The other things we flag</h2>
+        <p>Open any trip and these appear underneath, where they apply.</p>
+        <dl class="flagdoc">
+          <dt>Collect and re-check bags between flights</dt>
+          <dd>On every connection, because on separate tickets it is always true. Your bag is
+            checked to the connecting airport, not your destination. You collect it, leave the
+            secure area, and check in again from scratch.</dd>
+
+          <dt>Overnight connection</dt>
+          <dd>The second flight leaves before 06:00, the first lands after 23:00, or the two fall
+            on different days. You will need somewhere to sleep, and some airports close landside
+            overnight. Budget for a room before comparing this against a direct flight.</dd>
+
+          <dt>You clear immigration into <em>[country]</em></dt>
+          <dd>A self-transfer always means formally entering the connecting country — there is no
+            sterile transit corridor when you have to collect a bag. Usually routine. Worth
+            reading if your passport needs a visa for that country.</dd>
+
+          <dt>Requires entry to <em>[country]</em> — outside the Schengen area you started in</dt>
+          <dd>The connection crosses a border your trip did not otherwise require. Vienna to
+            Morocco via Italy stays inside Schengen until the final flight; the same trip via
+            London means a UK entry, with whatever that involves for your nationality.</dd>
+
+          <dt>Only <em>[n]</em> hours to make the transfer · <em>[n]</em> hours waiting</dt>
+          <dd>The two ends of uncomfortable. Both feed the ranking, and both are adjustable.</dd>
+        </dl>
+      </section>
+
+      <section>
+        <h2>Why the cheapest trip is not always first</h2>
+        <p>A €35 fare with a seven-hour wait and an 05:45 alarm is not obviously better than €42
+          with a three-hour wait, so sorting purely by price answers the wrong question. Flighthop
+          converts discomfort into money and adds it to the fare:</p>
+        <pre class="formula">fare
++ €25 per hour   the layover falls short of 3h    (risk of missing it)
++ €8  per hour   it drags on past 8h              (dead time)
++ €60            overnight connection
++ €30            a border crossing the trip did not already require</pre>
+        <p>That total is what <b>Best</b> sorts by. The two per-hour figures are the sidebar
+          sliders — <b>cost of a rushed transfer</b> and <b>cost of dead time</b>. Set both to
+          zero and Best becomes Cheapest. Push the first one up and short layovers sink. They are
+          your numbers, not ours.</p>
+        <p><b>Cheapest</b> and <b>Fastest</b> ignore the scoring entirely and sort by fare and by
+          door-to-door time.</p>
+      </section>
+
+      <section>
+        <h2>Questions</h2>
+        <div class="faq">
+          <details>
+            <summary>Can I book here?</summary>
+            <p>No, and deliberately not. Each leg links out to Ryanair's own booking page and you
+              buy them separately. Two tickets means two transactions, and hiding that behind a
+              single "Book" button would be a lie with a real cost attached.</p>
+          </details>
+
+          <details>
+            <summary>What happens if I miss the connection?</summary>
+            <p>You have lost that ticket. No protection, no re-booking, no compensation — as far
+              as the airline is concerned they are two unrelated journeys. Open a trip and
+              Flighthop tells you whether a later flight exists on that route the same day, read
+              from the published timetable. That is your real fallback, and it costs a new ticket.</p>
+          </details>
+
+          <details>
+            <summary>Do I have to collect my bags at the connection?</summary>
+            <p>Yes, on every connection here. Bags are checked to the connecting airport only.
+              Factor in the belt, the walk, and a check-in desk that may not open until two hours
+              before departure — that last one is why very short layovers fail even when both
+              flights are on time.</p>
+          </details>
+
+          <details>
+            <summary>Are the prices what I will actually pay?</summary>
+            <p>They are the fare for one adult with a cabin bag, at the moment we asked. Checked
+              bags, seat selection and priority are not included, and fares move — sometimes
+              within the hour. Treat every number here as "worth looking at", then confirm on the
+              airline's page before committing.</p>
+          </details>
+
+          <details>
+            <summary>Why does one flight seem to arrive before it departs?</summary>
+            <p>Because it does, on the clock. Madrid 13:10 → Tangier 12:40 is correct: the two are
+              an hour apart, and Morocco does not follow the EU's daylight saving changes. Every
+              time shown is local to that airport, which is what your boarding pass will say. The
+              layover and total journey time are computed in UTC underneath, so they stay right
+              across timezone changes.</p>
+          </details>
+
+          <details>
+            <summary>Why is the minimum layover 2 hours?</summary>
+            <p>Below that a self-transfer stops being realistic — you cannot reliably land,
+              collect a bag, check in again and clear security in less. The slider goes down to 1
+              hour if you disagree and are carrying nothing but a cabin bag, but the floor exists
+              because showing 40-minute connections would mean showing trips that do not work.</p>
+          </details>
+
+          <details>
+            <summary>Why do some searches show fewer connections than others?</summary>
+            <p>Two filters run before pricing. Connections through wildly out-of-the-way airports
+              are dropped — the network technically allows Vienna to Tangier via Stockholm, and
+              nobody wants that. And only the most promising airports get priced rather than every
+              theoretically possible one, which keeps a search to a few seconds and keeps our
+              traffic to the airline modest.</p>
+          </details>
+
+          <details>
+            <summary>How fresh is the data?</summary>
+            <p>Fares are re-checked every few hours, route maps every few days, the airport list
+              monthly. Caching is why a repeat search returns instantly. It also means a price can
+              be slightly stale — the airline's own page is always the truth.</p>
+          </details>
+
+          <details>
+            <summary>Do I need a visa for the country I connect through?</summary>
+            <p>Possibly, and we cannot tell you — it depends on your passport. What Flighthop can
+              tell you is which country you will enter, and whether that crossing is one your trip
+              already required. Both are on the trip detail. The rest is between you and that
+              country's rules.</p>
+          </details>
+
+          <details>
+            <summary>Is this run by Ryanair?</summary>
+            <p>No. Not affiliated with them, not endorsed by them, not connected to them in any
+              way. It is a personal tool that reads publicly available flight and fare information
+              and does arithmetic on it.</p>
+          </details>
+        </div>
+      </section>
+
     </div>
   </div>
 

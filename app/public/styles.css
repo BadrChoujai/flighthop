@@ -353,6 +353,71 @@ td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weig
 td.dim { color: var(--muted); font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .scroll { overflow-x: auto; }
 
+/* ---------- how it works ---------- */
+.infolink {
+  font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 7px 13px; white-space: nowrap; flex-shrink: 0;
+}
+.infolink:hover { color: var(--accent); border-color: var(--accent); }
+.infolink[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+.info { max-width: 68ch; margin: 0 auto; }
+.info section { margin-bottom: 46px; }
+.info h2 {
+  font-family: var(--display); font-size: 23px; font-weight: 650;
+  letter-spacing: -.02em; margin: 0 0 14px; text-wrap: balance;
+}
+.info p { margin: 0 0 14px; color: var(--ink-2); }
+.info em { font-style: normal; color: var(--muted); }
+
+.callout {
+  border-left: 3px solid var(--wait);
+  background: var(--wait-soft);
+  border-radius: 0 8px 8px 0;
+  padding: 13px 16px;
+  color: var(--ink) !important;
+}
+.callout strong { color: var(--wait); }
+
+.tagdoc { display: grid; gap: 1px; background: var(--line-soft); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.tagdoc-row { display: grid; grid-template-columns: 116px 1fr; gap: 16px; padding: 16px 18px; background: var(--surface); align-items: start; }
+.tagdoc-row .chip { margin-top: 2px; }
+.tagdoc-row b { display: block; font-size: 14.5px; margin-bottom: 4px; }
+.tagdoc-row p { margin: 0; font-size: 14.5px; line-height: 1.55; }
+
+.flagdoc { margin: 0; }
+.flagdoc dt {
+  font-family: var(--mono); font-size: 12.5px; color: var(--ink);
+  background: var(--surface-2); border: 1px solid var(--line-soft);
+  border-radius: 5px; padding: 4px 9px; display: inline-block; margin-bottom: 7px;
+}
+.flagdoc dd { margin: 0 0 22px; color: var(--ink-2); font-size: 15px; }
+
+.formula {
+  font-family: var(--mono); font-size: 13px; line-height: 1.75;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 9px; padding: 15px 17px; margin: 0 0 16px;
+  overflow-x: auto; color: var(--ink-2);
+}
+
+.faq { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.faq details { border-bottom: 1px solid var(--line-soft); }
+.faq details:last-child { border-bottom: 0; }
+.faq summary {
+  cursor: pointer; padding: 14px 18px; font-size: 15.5px; font-weight: 600;
+  color: var(--ink); list-style: none; display: flex; align-items: center; gap: 11px;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::before {
+  content: "+"; font-family: var(--mono); color: var(--accent);
+  font-size: 15px; width: 12px; flex-shrink: 0;
+}
+.faq details[open] summary::before { content: "−"; }
+.faq summary:hover { background: var(--surface-2); }
+.faq details p { margin: 0; padding: 0 18px 16px 41px; font-size: 14.5px; color: var(--ink-2); }
+
 /* ---------- states ---------- */
 .state { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 26px 22px; text-align: center; }
 .state h3 { font-family: var(--display); font-size: 18px; margin: 0 0 6px; font-weight: 650; }
@@ -371,7 +436,9 @@ footer { margin-top: 40px; font-size: 12.5px; color: var(--muted); }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
-@media (max-width: 1080px) {
+/* Brand + tabs + "How it works" take ~440px of the header before the search bar
+   gets any, so drop the bar onto its own row well before things get cramped. */
+@media (max-width: 1200px) {
   .headrow { flex-wrap: wrap; }
   .searchbar { order: 3; flex-basis: 100%; }
   .tabs { margin-left: auto; }
@@ -387,4 +454,5 @@ footer { margin-top: 40px; font-size: 12.5px; color: var(--muted); }
   .pop-cal { width: calc(100vw - 32px); left: 0; right: auto; }
   .cal-months { grid-template-columns: 1fr; }
   .cal-months .cal-month:last-child { display: none; }
+  .tagdoc-row { grid-template-columns: 1fr; gap: 9px; }
 }

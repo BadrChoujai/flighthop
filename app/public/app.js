@@ -106,16 +106,33 @@ fetch('/api/airports').then(r => r.json()).then(list => {
 
 /* ---------- tabs ---------- */
 function showTab(which) {
-  const isSearch = which === 'search';
-  $('tab-search').setAttribute('aria-selected', String(isSearch));
-  $('tab-explore').setAttribute('aria-selected', String(!isSearch));
-  $('view-search').classList.toggle('hidden', !isSearch);
-  $('view-explore').classList.toggle('hidden', isSearch);
-  $('searchForm').classList.toggle('hidden', !isSearch);
-  $('exploreForm').classList.toggle('hidden', isSearch);
+  for (const [name, view, form] of [
+    ['search', 'view-search', 'searchForm'],
+    ['explore', 'view-explore', 'exploreForm'],
+    ['info', 'view-info', null],
+  ]) {
+    const on = which === name;
+    $(view).classList.toggle('hidden', !on);
+    if (form) $(form).classList.toggle('hidden', !on);
+  }
+  $('tab-search').setAttribute('aria-selected', String(which === 'search'));
+  $('tab-explore').setAttribute('aria-selected', String(which === 'explore'));
+  $('tab-info').setAttribute('aria-pressed', String(which === 'info'));
+  if (which === 'info') scrollTo({ top: 0, behavior: 'smooth' });
 }
 $('tab-search').onclick = () => showTab('search');
 $('tab-explore').onclick = () => showTab('explore');
+$('tab-info').onclick = () => showTab($('tab-info').getAttribute('aria-pressed') === 'true' ? 'search' : 'info');
+
+/* A tag in the results is the natural place to wonder what it means, so make it
+   the link to the explanation. */
+addEventListener('click', (e) => {
+  const chip = e.target.closest('.card .chip');
+  if (!chip) return;
+  e.stopPropagation();                       // don't also expand the trip
+  showTab('info');
+  requestAnimationFrame(() => $('tags').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}, true);
 
 /* ---------- rail controls ---------- */
 const bind = (id, out, fmt, onChange) => {
