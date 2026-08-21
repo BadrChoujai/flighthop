@@ -361,7 +361,11 @@ button.go:disabled { opacity: .55; cursor: default; }
 .stopshint { font-size: 13px; color: var(--muted); }
 
 /* ---------- filter rail ---------- */
-.rail { position: sticky; top: 86px; display: grid; gap: 14px; align-content: start; }
+/* Sticky positioning creates a stacking context, so a popover inside the rail
+   could only ever rise above the rail's own contents — the result cards beside
+   it painted over the country list. Lifting the rail lifts what it contains,
+   and it stays under the search panel (30) and the header (40). */
+.rail { position: sticky; top: 86px; z-index: 20; display: grid; gap: 14px; align-content: start; }
 /* Grid and flex children refuse to shrink past their content unless told to. */
 .rail > *, .rail section > *, .ctrl, .ctrl-head { min-width: 0; }
 .rail .seg-toggle button { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
