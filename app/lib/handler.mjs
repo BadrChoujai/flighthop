@@ -40,7 +40,9 @@ async function serveStatic(res, pathname) {
     const body = await readFile(file);
     res.writeHead(200, {
       'content-type': TYPES[extname(file)] ?? 'application/octet-stream',
-      'cache-control': file.endsWith('index.html') ? 'no-cache' : 'public, max-age=3600',
+      // These filenames are not content-hashed, so any real max-age serves stale
+      // JS and CSS after a deploy. They are a few KB — revalidate every time.
+      'cache-control': 'no-cache',
     });
     res.end(body);
   } catch {

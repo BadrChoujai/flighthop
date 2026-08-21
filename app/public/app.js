@@ -180,11 +180,27 @@ function runSearch() {
 
   stream = new EventSource('/api/search?' + q);
 
+  // The server reports every phase, not just hub pricing — building the route
+  // graph is most of the wait on a country search, and silence there reads as a
+  // hang. Each phase owns a slice of the bar so it only ever moves forwards.
+  const PHASES = {
+    airports: { headline: 'Searching the network', from: 0, to: 5 },
+    graph: { headline: 'Searching the network', from: 5, to: 15 },
+    inbound: { headline: 'Working out what connects', from: 15, to: 35 },
+    direct: { headline: 'Checking direct flights', from: 35, to: 45 },
+    hubs: { headline: 'Pricing every connection', from: 45, to: 100 },
+  };
+
   stream.addEventListener('progress', (e) => {
     const p = JSON.parse(e.data);
-    $('loadingSub').textContent = `Pricing ${p.total} possible connections`;
-    $('progressBar').style.width = `${(p.done / p.total) * 100}%`;
-    $('progressText').textContent = `${p.hubName} (${p.hub}) · ${p.done} of ${p.total}`;
+    const phase = PHASES[p.phase] ?? PHASES.hubs;
+    const share = p.total ? (p.done ?? 0) / p.total : 0;
+
+    $('loadingSub').textContent = phase.headline;
+    $('progressBar').style.width = `${phase.from + (phase.to - phase.from) * share}%`;
+    $('progressText').textContent = p.total > 1
+      ? `${p.label} · ${p.done} of ${p.total}`
+      : p.label;
   });
 
   stream.addEventListener('result', (e) => {
@@ -250,9 +266,17 @@ function render() {
   const rows = visible();
   const r = state.result;
 
-  const dest = r.targets.length > 1
-    ? `${r.targets.length} airports`
-    : (airports.find(a => a.code === r.targets[0])?.city ?? r.targets[0]);
+  // A country search resolves to a list of airports, but "13 airports" is not what
+  // the person typed. Name the country when they all share one.
+  const dest = (() => {
+    if (r.targets.length === 1) {
+      return airports.find(a => a.code === r.targets[0])?.city ?? r.targets[0];
+    }
+    const countries = new Set(r.targets.map(c => airports.find(a => a.code === c)?.country));
+    return countries.size === 1
+      ? [...countries][0]
+      : `${r.targets.length} airports`;
+  })();
   $('resultTitle').textContent = `${airports.find(a => a.code === r.origin)?.city ?? r.origin} → ${dest}`;
   $('resultCount').textContent =
     `${rows.length} of ${r.direct.length + r.itineraries.length} shown · ${r.meta.hubsSearched} hubs searched` +

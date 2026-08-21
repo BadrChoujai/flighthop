@@ -144,13 +144,19 @@ function assess(a, b, layover, hub, byCode, w) {
 }
 
 /**
- * @param onProgress called with { done, total, hub } as hubs resolve
+ * @param onProgress called with { phase, label, done, total } throughout. The graph
+ *   has to be built before any hub can be priced, so the early phases report too —
+ *   otherwise a country search sits silent for ten seconds before the first hub.
  */
 export async function search({
   origin, destination, from, to, currency = 'EUR', weights = {}, onProgress = () => {},
 }) {
   const w = { ...DEFAULTS, ...weights };
+
+  onProgress({ phase: 'airports', label: 'Loading the airport network' });
   const { byCode } = await airportIndex();
+  const name = (code) => byCode.get(code)?.city?.name ?? byCode.get(code)?.name ?? code;
+
   origin = origin.trim().toUpperCase();
   if (!byCode.has(origin)) throw Object.assign(new Error(`Unknown origin ${origin}`), { code: 400 });
 
@@ -158,27 +164,50 @@ export async function search({
   if (!targets.length) throw Object.assign(new Error(`No airport matches "${destination}"`), { code: 400 });
 
   const window = { from, to };
+
+  onProgress({ phase: 'graph', label: `Mapping every route out of ${name(origin)}` });
   const outbound = new Set((await routesFrom(origin)).map(r => r.code));
 
   // Direct routes first — if one exists the whole exercise may be unnecessary.
-  const direct = [];
-  for (const t of targets.filter(t => outbound.has(t))) {
-    const schedule = await schedules(origin, t, window);
-    for (const leg of await legOptions(origin, t, window, currency)) {
-      direct.push({ kind: 'direct', target: t, price: leg.price, currency: leg.currency,
-                    total: +hours(leg.arr - leg.dep).toFixed(2), score: leg.price,
-                    legs: [shape(leg, schedule)] });
-    }
-  }
+  // Fan out across targets: a country search has a dozen of them, and doing these
+  // one after another is most of the wait before the first result appears. The
+  // client is capped at four concurrent requests regardless.
+  const directTargets = targets.filter(t => outbound.has(t));
+  let directDone = 0;
+  const direct = (await Promise.all(directTargets.map(async (t) => {
+    const [schedule, legs] = await Promise.all([
+      schedules(origin, t, window),
+      legOptions(origin, t, window, currency),
+    ]);
+    onProgress({
+      phase: 'direct', done: ++directDone, total: directTargets.length,
+      label: `Pricing direct flights to ${name(t)}`,
+    });
+    return legs.map(leg => ({
+      kind: 'direct', target: t, price: leg.price, currency: leg.currency,
+      total: +hours(leg.arr - leg.dep).toFixed(2), score: leg.price,
+      legs: [shape(leg, schedule)],
+    }));
+  }))).flat();
   direct.sort((a, b) => a.price - b.price);
 
   // Candidate hubs: reachable from origin and connected to a target.
+  let inboundDone = 0;
+  const inbound = await Promise.all(targets.map(async (target) => {
+    const routes = await routesFrom(target);
+    onProgress({
+      phase: 'inbound', done: ++inboundDone, total: targets.length,
+      label: `Finding what connects to ${name(target)}`,
+    });
+    return { target, routes };
+  }));
+
   const candidates = new Map();
-  for (const t of targets) {
-    for (const r of await routesFrom(t)) {
+  for (const { target, routes } of inbound) {
+    for (const r of routes) {
       if (r.code === origin || !outbound.has(r.code)) continue;
       if (!candidates.has(r.code)) candidates.set(r.code, new Set());
-      candidates.get(r.code).add(t);
+      candidates.get(r.code).add(target);
     }
   }
 
@@ -196,6 +225,11 @@ export async function search({
     .filter(h => h.detour <= w.detourFactor)
     .sort((a, b) => a.detour - b.detour)
     .slice(0, w.maxHubs);
+
+  onProgress({
+    phase: 'hubs', done: 0, total: ranked.length,
+    label: `${ranked.length} airports could connect you — pricing each one`,
+  });
 
   const itineraries = [];
   let done = 0;
@@ -241,7 +275,11 @@ export async function search({
         }
       }
     }
-    onProgress({ done: ++done, total: ranked.length, hub, hubName: byCode.get(hub)?.name ?? hub });
+    onProgress({
+      phase: 'hubs', done: ++done, total: ranked.length,
+      hub, hubName: byCode.get(hub)?.name ?? hub,
+      label: `${byCode.get(hub)?.name ?? hub} (${hub})`,
+    });
   }));
 
   itineraries.sort((a, b) => a.score - b.score);
