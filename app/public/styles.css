@@ -75,6 +75,10 @@
 
 * { box-sizing: border-box; }
 
+/* The browser's own [hidden] rule is only as specific as a class, so any
+   `display` we set on an element defeats it. Restore the attribute's meaning. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--ground);
