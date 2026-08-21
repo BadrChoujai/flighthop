@@ -41,37 +41,7 @@
       </button>
     </h1>
 
-    <form class="searchbar" id="searchForm">
-      <div class="field picker" id="fromPicker">
-        <label for="from">From</label>
-        <input id="from" placeholder="Where are you flying from?" required />
-      </div>
-      <div class="field picker" id="toPicker">
-        <label for="to">To</label>
-        <input id="to" placeholder="Anywhere, or a country" required />
-      </div>
-      <div class="field range" id="rangePicker">
-        <label>When</label>
-        <button type="button" class="range-btn"><span class="range-value">Pick dates</span></button>
-      </div>
-      <button class="go" type="submit" id="goBtn">Search</button>
-    </form>
 
-    <form class="searchbar hidden" id="exploreForm">
-      <div class="field picker" id="xfromPicker">
-        <label for="xfrom">From</label>
-        <input id="xfrom" placeholder="Where are you flying from?" required />
-      </div>
-      <div class="field picker" id="xcountryPicker">
-        <label for="xcountry">To</label>
-        <input id="xcountry" placeholder="Anywhere" />
-      </div>
-      <div class="field range" id="xrangePicker">
-        <label>When</label>
-        <button type="button" class="range-btn"><span class="range-value">Pick dates</span></button>
-      </div>
-      <button class="go" type="submit">Find</button>
-    </form>
 
     <div class="tabs" role="tablist">
       <button role="tab" id="tab-search" aria-selected="false">Connect me</button>
@@ -109,8 +79,8 @@
           <button class="cta" id="heroSearch">Find my connection</button>
           <button class="cta-ghost" id="heroHow">How it works</button>
         </div>
-        <p class="hero-note">No account. No booking fee. Fourteen ways from Vienna to Tangier, a
-          route the airline says does not exist.</p>
+        <p class="hero-note">No account, no booking fee. Pick two cities the airline swears are not
+          connected, and see how many ways there actually are.</p>
       </div>
 
       <!-- The illustration is the pitch: the straight line is struck out, the
@@ -134,15 +104,15 @@
 
           <g class="art-node art-node-a">
             <circle cx="60" cy="190" r="7" />
-            <text x="60" y="216">VIE</text>
+            <text x="60" y="216">YOU</text>
           </g>
           <g class="art-node art-node-hub">
             <circle cx="200" cy="140" r="7" />
-            <text x="200" y="166">BGY</text>
+            <text x="200" y="166">HUB</text>
           </g>
           <g class="art-node art-node-b">
             <circle cx="360" cy="90" r="7" />
-            <text x="360" y="116">TNG</text>
+            <text x="360" y="116">THERE</text>
           </g>
 
         </svg>
@@ -158,8 +128,8 @@
             <path d="M5.6 16.6L10.4 10.6M13.7 10.4L18.4 14.6" />
           </svg>
           <h4>Routes nobody sells</h4>
-          <p>Two tickets through a hub, paired only when the timings actually work. Fourteen hubs
-            appear for a pair the airline calls unconnected.</p>
+          <p>Two, three or four tickets through a hub, paired only when the timings actually work —
+            for city pairs no airline lists at all.</p>
         </article>
 
         <article class="offer">
@@ -189,8 +159,8 @@
             <rect x="7" y="12.4" width="3.4" height="3" rx="1" fill="currentColor" stroke="none" />
           </svg>
           <h4>The cheapest day, at a glance</h4>
-          <p>A month of prices for the whole journey, connections included. The spread runs €35 to
-            €220 — flexibility beats every booking trick.</p>
+          <p>A month of prices for the whole journey, connections included. The gap between the best
+            day and the worst is usually enormous — flexibility beats every booking trick.</p>
         </article>
       </div>
     </section>
@@ -204,48 +174,104 @@
 
   <!-- ============ SEARCH ============ -->
   <div id="view-search" class="hidden">
+    <div class="searchpanel">
+      <form class="searchbar" id="searchForm">
+        <div class="field picker" id="fromPicker">
+          <label for="from">From</label>
+          <input id="from" placeholder="Where are you flying from?" required />
+        </div>
+        <div class="field picker" id="toPicker">
+          <label for="to">To</label>
+          <input id="to" placeholder="Anywhere, or a country" required />
+        </div>
+        <div class="field range" id="rangePicker">
+          <label>When</label>
+          <button type="button" class="range-btn"><span class="range-value">Pick dates</span></button>
+        </div>
+        <button class="go" type="submit" id="goBtn">Search</button>
+      </form>
+      <div class="stopspicker" role="group" aria-label="How many tickets to search">
+        <span class="stopslabel">Search up to</span>
+        <div class="seg-toggle" id="stopsToggle">
+          <button data-stops="1" aria-pressed="true">2 tickets</button>
+          <button data-stops="2" aria-pressed="false">3 tickets</button>
+          <button data-stops="3" aria-pressed="false">4 tickets</button>
+        </div>
+        <span class="stopshint" id="stopsHint">One stop. Fastest to search.</span>
+      </div>
+    </div>
+
     <div class="layout">
-      <div class="rail">
-        <section>
-          <h3>Connection</h3>
-          <div class="ctrl">
-            <div class="ctrl-head"><span>Minimum layover</span><b id="minLayoutOut">2.0 h</b></div>
-            <input type="range" id="minLayover" min="1" max="8" step="0.5" value="2" />
-          </div>
-          <div class="ctrl">
-            <div class="ctrl-head"><span>Maximum layover</span><b id="maxLayoutOut">18 h</b></div>
-            <input type="range" id="maxLayover" min="3" max="24" step="1" value="18" />
-          </div>
-          <div class="ctrl">
-            <label class="check"><input type="checkbox" id="noOvernight" /> Hide overnight connections</label>
-          </div>
-        </section>
+      <button class="filterfab" id="filterFab" aria-expanded="false" aria-controls="rail">
+        Filters<span class="fab-count hidden" id="fabCount">0</span>
+      </button>
+
+      <aside class="rail" id="rail">
+        <div class="rail-top">
+          <h3 class="rail-title">Filters<span class="rail-count hidden" id="railCount">0</span></h3>
+          <button type="button" class="rail-clear hidden" id="clearFilters">Clear all</button>
+          <button type="button" class="rail-close" id="closeFilters" aria-label="Close filters">×</button>
+        </div>
 
         <section>
-          <h3>Rank by</h3>
+          <h4>Sort by</h4>
           <div class="seg-toggle" id="sortToggle">
             <button data-sort="score" aria-pressed="true">Best</button>
             <button data-sort="price" aria-pressed="false">Cheapest</button>
             <button data-sort="total" aria-pressed="false">Fastest</button>
           </div>
-          <div class="ctrl" style="margin-top:15px">
-            <div class="ctrl-head"><span>Cost of a rushed transfer</span><b id="tightOut">€25/h</b></div>
-            <input type="range" id="tightPenalty" min="0" max="60" step="5" value="25" />
-          </div>
-          <div class="ctrl">
-            <div class="ctrl-head"><span>Cost of dead time</span><b id="longOut">€8/h</b></div>
-            <input type="range" id="longPenalty" min="0" max="30" step="1" value="8" />
+        </section>
+
+        <section>
+          <h4>Tickets</h4>
+          <div class="chips" id="ticketChips" role="group" aria-label="Number of tickets">
+            <button data-tickets="any" aria-pressed="true">Any</button>
+            <button data-tickets="1" aria-pressed="false">1</button>
+            <button data-tickets="2" aria-pressed="false">2</button>
+            <button data-tickets="3" aria-pressed="false">3</button>
+            <button data-tickets="4" aria-pressed="false">4</button>
           </div>
         </section>
 
         <section>
-          <h3>Budget</h3>
+          <h4>Layover</h4>
           <div class="ctrl">
-            <div class="ctrl-head"><span>Maximum total</span><b id="maxPriceOut">any</b></div>
+            <div class="ctrl-head"><label for="minLayover">At least</label><b id="minLayoutOut">2.0 h</b></div>
+            <input type="range" id="minLayover" min="1" max="8" step="0.5" value="2" />
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-head"><label for="maxLayover">At most</label><b id="maxLayoutOut">18 h</b></div>
+            <input type="range" id="maxLayover" min="3" max="24" step="1" value="18" />
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="noOvernight" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">Hide overnight stops</span>
+          </label>
+        </section>
+
+        <section>
+          <h4>Budget</h4>
+          <div class="ctrl">
+            <div class="ctrl-head"><label for="maxPrice">Total fare under</label><b id="maxPriceOut">any</b></div>
             <input type="range" id="maxPrice" min="0" max="400" step="10" value="0" />
           </div>
         </section>
-      </div>
+
+        <details class="rail-advanced">
+          <summary>What discomfort costs you</summary>
+          <p class="rail-help">“Best” adds these to the fare, so ranking reflects your tolerance
+            rather than ours.</p>
+          <div class="ctrl">
+            <div class="ctrl-head"><label for="tightPenalty">A rushed transfer</label><b id="tightOut">€25/h</b></div>
+            <input type="range" id="tightPenalty" min="0" max="60" step="5" value="25" />
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-head"><label for="longPenalty">Dead time waiting</label><b id="longOut">€8/h</b></div>
+            <input type="range" id="longPenalty" min="0" max="30" step="1" value="8" />
+          </div>
+        </details>
+      </aside>
 
       <div>
         <div id="monthPanel" class="month-panel hidden">
@@ -279,7 +305,8 @@
 
         <div class="state" id="idle">
           <h3>Where do you want to go?</h3>
-          <p>Try Vienna to Tangier — an airline will tell you that route does not exist.</p>
+          <p>Name any two cities. If no airline joins them directly, that is exactly when this
+            is worth running.</p>
         </div>
 
         <div class="state hidden" id="loading">
@@ -299,6 +326,24 @@
 
   <!-- ============ EXPLORE ============ -->
   <div id="view-explore" class="hidden">
+    <div class="searchpanel">
+      <form class="searchbar" id="exploreForm">
+        <div class="field picker" id="xfromPicker">
+          <label for="xfrom">From</label>
+          <input id="xfrom" placeholder="Where are you flying from?" required />
+        </div>
+        <div class="field picker" id="xcountryPicker">
+          <label for="xcountry">To</label>
+          <input id="xcountry" placeholder="Anywhere" />
+        </div>
+        <div class="field range" id="xrangePicker">
+          <label>When</label>
+          <button type="button" class="range-btn"><span class="range-value">Pick dates</span></button>
+        </div>
+        <button class="go" type="submit">Find</button>
+      </form>
+    </div>
+
     <div class="layout">
       <div class="rail">
         <section>
@@ -338,9 +383,9 @@
 
       <section>
         <h2>What this actually does</h2>
-        <p>Airlines sell you routes they have already decided exist. Ryanair flies from Vienna,
-          and it flies to Tangier, but it does not sell Vienna&nbsp;→&nbsp;Tangier — so searching
-          for it returns nothing.</p>
+        <p>Airlines sell you routes they have already decided exist. Plenty of city pairs are joined
+          by the same airline at both ends and still cannot be bought as one journey — search for
+          them and you get nothing back.</p>
         <p>Flighthop reads the network as a map rather than a list. It finds every airport the
           airline flies to from where you are <em>and</em> flies from to where you want to be,
           then pairs up flights whose timings actually work and prices the pair.</p>
@@ -421,9 +466,10 @@
             reading if your passport needs a visa for that country.</dd>
 
           <dt>Requires entry to <em>[country]</em> — outside the Schengen area you started in</dt>
-          <dd>The connection crosses a border your trip did not otherwise require. Vienna to
-            Morocco via Italy stays inside Schengen until the final flight; the same trip via
-            London means a UK entry, with whatever that involves for your nationality.</dd>
+          <dd>The connection crosses a border your trip did not otherwise require. Two Schengen
+            countries either side of a Schengen hub ask nothing extra of you; routing the same
+            trip through London means a UK entry, with whatever that involves for your
+            nationality.</dd>
 
           <dt>Only <em>[n]</em> hours to make the transfer · <em>[n]</em> hours waiting</dt>
           <dd>The two ends of uncomfortable. Both feed the ranking, and both are adjustable.</dd>
@@ -484,11 +530,11 @@
 
           <details>
             <summary>Why does one flight seem to arrive before it departs?</summary>
-            <p>Because it does, on the clock. Madrid 13:10 → Tangier 12:40 is correct: the two are
-              an hour apart, and Morocco does not follow the EU's daylight saving changes. Every
-              time shown is local to that airport, which is what your boarding pass will say. The
-              layover and total journey time are computed in UTC underneath, so they stay right
-              across timezone changes.</p>
+            <p>Because it does, on the clock. Fly west across an hour of timezone and you can land
+              earlier than you left — and not every country changes its clocks on the same date, so
+              the gap between two places moves during the year. Every time shown is local to that
+              airport, which is what your boarding pass will say. Layovers and total journey time
+              are computed in UTC underneath, so they stay right across any timezone change.</p>
           </details>
 
           <details>
@@ -501,9 +547,9 @@
 
           <details>
             <summary>Why do some searches show fewer connections than others?</summary>
-            <p>Two filters run before pricing. Connections through wildly out-of-the-way airports
-              are dropped — the network technically allows Vienna to Tangier via Stockholm, and
-              nobody wants that. And only the most promising airports get priced rather than every
+            <p>Two filters run before pricing. Routings that wander wildly out of the way are
+              dropped — the network will happily send you north to travel south, and nobody wants
+              that. And only the most promising airports get priced rather than every
               theoretically possible one, which keeps a search to a few seconds and keeps our
               traffic to the airline modest.</p>
           </details>

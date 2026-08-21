@@ -7,8 +7,13 @@ const $ = (id) => document.getElementById(id);
 const state = {
   result: null, sort: 'score', pinnedDay: null, expanded: new Set(),
   page: 1, xrows: [], xpage: 1, lastSearchView: 'search',
+  tickets: 'any', maxStops: 1,
 };
 const PER_PAGE = 15;
+
+/* The values every slider starts at, so "how many filters are active" and
+   "clear all" have a single definition to work from. */
+const FILTER_DEFAULTS = { minLayover: '2', maxLayover: '18', maxPrice: '0', tightPenalty: '25', longPenalty: '8' };
 
 /* ---------- helpers ---------- */
 const hrs = (h) => h >= 1
@@ -210,14 +215,80 @@ bind('longPenalty', 'longOut', v => `€${v}/h`, () => rerank());
 bind('maxPrice', 'maxPriceOut', v => (Number(v) === 0 ? 'any' : `€${v}`), () => rerank());
 $('noOvernight').addEventListener('change', () => rerank());
 
+const press = (group, btn) =>
+  [...group.children].forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+
 $('sortToggle').addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-sort]');
   if (!btn) return;
   state.sort = btn.dataset.sort;
-  [...$('sortToggle').children].forEach(b =>
-    b.setAttribute('aria-pressed', String(b === btn)));
+  press($('sortToggle'), btn);
   rerank();
 });
+
+$('ticketChips').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-tickets]');
+  if (!btn) return;
+  state.tickets = btn.dataset.tickets === 'any' ? 'any' : Number(btn.dataset.tickets);
+  press($('ticketChips'), btn);
+  rerank();
+});
+
+/* How many tickets to *search* for is a query parameter, not a view filter — it
+   changes what the server looks for, so it re-runs the search. */
+const STOPS_HINT = {
+  1: 'One stop. Fastest to search.',
+  2: 'Up to two stops. Slower, and finds routes one stop cannot.',
+  3: 'Up to three stops. Slowest, and a long day of flying.',
+};
+$('stopsToggle').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-stops]');
+  if (!btn) return;
+  state.maxStops = Number(btn.dataset.stops);
+  press($('stopsToggle'), btn);
+  $('stopsHint').textContent = STOPS_HINT[state.maxStops];
+  if (state.result) runSearch();     // only re-fetch if there is something to redo
+});
+
+/* ---------- filter chrome ---------- */
+
+function activeFilterCount() {
+  let n = 0;
+  for (const [id, value] of Object.entries(FILTER_DEFAULTS)) if ($(id).value !== value) n++;
+  if ($('noOvernight').checked) n++;
+  if (state.tickets !== 'any') n++;
+  return n;
+}
+
+function paintFilterCount() {
+  const n = activeFilterCount();
+  for (const id of ['railCount', 'fabCount']) {
+    $(id).textContent = n;
+    $(id).classList.toggle('hidden', n === 0);
+  }
+  $('clearFilters').classList.toggle('hidden', n === 0);
+}
+
+$('clearFilters').onclick = () => {
+  for (const [id, value] of Object.entries(FILTER_DEFAULTS)) {
+    $(id).value = value;
+    $(id).dispatchEvent(new Event('input'));
+  }
+  $('noOvernight').checked = false;
+  state.tickets = 'any';
+  press($('ticketChips'), $('ticketChips').firstElementChild);
+  rerank();
+};
+
+// On a narrow screen the rail becomes a sheet over the results.
+$('filterFab').onclick = () => {
+  document.body.classList.add('filters-open');
+  $('filterFab').setAttribute('aria-expanded', 'true');
+};
+$('closeFilters').onclick = () => {
+  document.body.classList.remove('filters-open');
+  $('filterFab').setAttribute('aria-expanded', 'false');
+};
 
 bind('xmax', 'xmaxOut', v => `€${v}`);
 bind('xafter', 'xafterOut', v => (Number(v) === 0 ? 'any' : `${String(v).padStart(2, '0')}:00`));
@@ -314,6 +385,7 @@ function runSearch() {
     from: pickers.from.commit(), to: pickers.to.commit(),
     dateFrom: ranges.search.from, dateTo: ranges.search.to,
     minLayover: $('minLayover').value, maxLayover: $('maxLayover').value,
+    maxStops: String(state.maxStops),
   });
 
   stream = new EventSource('/api/search?' + q);
@@ -378,7 +450,10 @@ function visible() {
   const long = Number($('longPenalty').value);
 
   const scored = [...r.direct, ...r.itineraries]
-    .filter(it => it.kind === 'direct' || (it.layover >= min && it.layover <= max))
+    // Layover limits apply to every connection in the chain, not just the tightest.
+    .filter(it => it.kind === 'direct' ||
+      it.layovers.every(w => w >= min && w <= max))
+    .filter(it => state.tickets === 'any' || (it.tickets ?? 1) === state.tickets)
     .filter(it => !cap || it.price <= cap)
     .filter(it => !(hideNight && it.flags?.some(f => f.id === 'overnight')))
     .filter(it => !state.pinnedDay || it.legs[0].depDate === state.pinnedDay)
@@ -386,10 +461,12 @@ function visible() {
       if (it.kind === 'direct') return { ...it, score: it.price };
       const overnight = it.flags.some(f => f.id === 'overnight');
       const border = it.flags.some(f => f.id === 'border');
-      const penalty =
-        (it.layover < 3 ? (3 - it.layover) * tight : 0) +
-        (it.layover > 8 ? (it.layover - 8) * long : 0) +
-        (overnight ? 60 : 0) + (border ? 30 : 0);
+      const penalty = it.layovers.reduce((sum, wait) =>
+        sum
+        + (wait < 3 ? (3 - wait) * tight : 0)
+        + (wait > 8 ? (wait - 8) * long : 0), 0)
+        + (overnight ? 60 : 0) + (border ? 30 : 0)
+        + (it.tickets - 1) * 20;
       return { ...it, score: it.price + penalty };
     });
 
@@ -403,6 +480,7 @@ function visible() {
    evaluating. */
 function rerank() {
   state.page = 1;
+  paintFilterCount();
   render();
 }
 
@@ -458,6 +536,26 @@ function render() {
   });
 }
 
+/** One bar segment per flight, one per wait, in order. Works for any leg count. */
+function barSegments(it, seg) {
+  if (it.kind === 'direct') {
+    return seg('seg-fly', 1, [`${hrs(it.total)} nonstop`, hrs(it.total), hrsCompact(it.total)]);
+  }
+  const flyLabels = (d) => [hrs(d), hrsCompact(d), hrsShort(d)];
+  let html = '';
+  it.legs.forEach((leg, i) => {
+    html += seg('seg-fly', leg.duration, flyLabels(leg.duration));
+    const wait = it.layovers[i];
+    if (wait === undefined) return;
+    const hub = leg.to;
+    html += seg('seg-wait', wait, [
+      `${hrs(wait)} in ${hub}`,
+      ...flyLabels(wait),
+    ]);
+  });
+  return html;
+}
+
 function card(it, i, maxSpan) {
   const id = `${it.kind}-${it.legs.map(l => l.from + l.day + l.depLocal).join('-')}`;
   const open = state.expanded.has(id);
@@ -468,39 +566,35 @@ function card(it, i, maxSpan) {
     `<div class="seg ${cls}" style="flex:${flex}" data-flex="${flex}"
           data-labels='${JSON.stringify(labels).replace(/'/g, '&apos;')}'><b></b></div>`;
 
-  const flyLabels = (d) => [hrs(d), hrsCompact(d), hrsShort(d)];
-
-  const bars = it.kind === 'direct'
-    ? seg('seg-fly', 1, [`${hrs(it.total)} nonstop`, ...flyLabels(it.total)])
-    : seg('seg-fly', it.legs[0].duration, flyLabels(it.legs[0].duration)) +
-      seg('seg-wait', it.layover, [
-        `${hrs(it.layover)} in ${it.hubCity ?? it.hubName}`,
-        `${hrs(it.layover)} in ${it.hub}`,
-        ...flyLabels(it.layover),
-      ]) +
-      seg('seg-fly', it.legs[1].duration, flyLabels(it.legs[1].duration));
+  const bars = barSegments(it, seg);
 
   const chip = it.kind === 'direct'
     ? '<span class="chip chip-direct">direct</span>'
     : `<span class="chip chip-${it.level}">${it.level}</span>`;
 
-  // The wait sits between the legs here too, so the itinerary is still readable
-  // when the bar is too narrow to caption.
-  const legLine = it.kind === 'direct'
-    ? `<b>${it.legs[0].from} ${it.legs[0].depLocal}</b> → <b>${it.legs[0].to} ${it.legs[0].arrLocal}</b>`
-    : `<b>${it.legs[0].from} ${it.legs[0].depLocal}</b> → <b>${it.legs[0].to} ${it.legs[0].arrLocal}</b>` +
-      ` &nbsp;·&nbsp; <span class="wait-inline">wait ${hrs(it.layover)}</span> &nbsp;·&nbsp; ` +
-      `<b>${it.legs[1].from} ${it.legs[1].depLocal}</b> → <b>${it.legs[1].to} ${it.legs[1].arrLocal}</b>`;
+  // The waits sit between the legs here too, so the itinerary stays readable when
+  // the bar is too narrow to caption.
+  const legLine = it.legs.map((l, i) => {
+    const flight = `<b>${l.from} ${l.depLocal}</b> → <b>${l.to} ${l.arrLocal}</b>`;
+    const wait = it.layovers?.[i];
+    return wait === undefined ? flight
+      : `${flight} &nbsp;·&nbsp; <span class="wait-inline">wait ${hrs(wait)}</span>`;
+  }).join(' &nbsp;·&nbsp; ');
+
+  const via = it.kind === 'direct' ? ''
+    : ` · via <span class="via">${it.hubs.join(' · ')}</span>`;
+  const tickets = it.kind === 'direct' ? '' :
+    `<span class="ticketpill">${it.tickets} tickets</span>`;
 
   return `<div class="card ${open ? 'open' : ''}" data-id="${id}" data-i="${i}">
     <div class="price">${money(it.price, it.currency)}
-      <small>${dayName(it.legs[0].depDate)}${it.kind === 'direct' ? '' : ` · via <span class="via">${it.hub}</span>`}</small>
+      <small>${dayName(it.legs[0].depDate)}${via}</small>
     </div>
     <div class="track">
       <div class="bars" style="width:${width}%">${bars}</div>
       <div class="legs">
         <span>${legLine}</span>
-        <span>${chip} &nbsp; ${hrs(it.total)} door to door</span>
+        <span>${tickets} ${chip} &nbsp; ${hrs(it.total)} door to door</span>
       </div>
     </div>
     ${open ? detail(it) : ''}
@@ -518,17 +612,19 @@ function detail(it) {
 
   const flags = (it.flags ?? []).map(f => `<span class="flag">${f.label}</span>`).join('');
 
-  let backup = '';
-  if (it.kind === 'connection') {
-    if (it.backup) {
-      backup = `<div class="backup">If the first flight runs late: <b>${it.backup.flight}</b> leaves ${it.hub} at
-        <b>${it.backup.depLocal}</b> the same day. You would be buying a new ticket for it.</div>`;
-    } else if (it.backup === null) {
-      backup = `<div class="backup">${it.hub} → ${it.legs[1].to} flies once that day. Miss it and the next one is tomorrow.</div>`;
-    } else {
-      backup = '<div class="backup">No published timetable for the second leg, so we cannot tell you whether a later flight exists.</div>';
+  // One line per connection: is there a later flight out of that hub the same day?
+  const backup = (it.backups ?? []).map((b, i) => {
+    const hub = it.hubs[i];
+    const onward = it.legs[i + 1];
+    if (b) {
+      return `<div class="backup">Miss the flight out of <b>${hub}</b> and <b>${b.flight}</b> leaves at
+        <b>${b.depLocal}</b> the same day — as a new ticket you would have to buy.</div>`;
     }
-  }
+    if (b === null) {
+      return `<div class="backup"><b>${hub} → ${onward.to}</b> flies once that day. Miss it and the next one is tomorrow.</div>`;
+    }
+    return `<div class="backup">No published timetable for <b>${hub} → ${onward.to}</b>, so we cannot tell you whether a later flight exists.</div>`;
+  }).join('');
 
   return `<div class="detail">
     <div class="detail-grid">${legs}</div>

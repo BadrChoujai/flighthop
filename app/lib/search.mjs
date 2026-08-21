@@ -7,8 +7,12 @@ import { airports, routesFrom, cheapestPerDay, timetable, localToUtc, bookingUrl
 export const DEFAULTS = {
   minLayover: 2,      // hours; below this a self-transfer is not realistic
   maxLayover: 18,
-  detourFactor: 1.7,  // reject hubs this many times further than flying direct
-  maxHubs: 22,
+  detourFactor: 1.7,  // reject routings this many times longer than flying direct
+  perDepth: { 1: 40, 2: 45, 3: 35 },   // routings priced at each stop count
+  expandFirst: 16,    // first-level hubs expanded when looking for two stops
+  expandSecond: 12,   // second-level hubs expanded when looking for three
+  maxPartials: 300,   // stitched part-itineraries kept per routing, cheapest first
+  ticketPenalty: 20,  // € per extra ticket: more chances for the chain to break
   tightBelow: 3,      // hours; comfort starts here
   longAbove: 8,
   tightPenalty: 25,   // € per hour under tightBelow
@@ -131,7 +135,7 @@ function shape(leg, schedule) {
   };
 }
 
-function assess(a, b, layover, hub, byCode, w) {
+function assessLayover(a, b, layover, hub, byCode, w) {
   const depHour = +b.depLocal.slice(11, 13);
   const arrHour = +a.arrLocal.slice(11, 13);
   const overnight = depHour < 6 || arrHour >= 23 || b.day !== a.day;
@@ -143,20 +147,160 @@ function assess(a, b, layover, hub, byCode, w) {
   const hubCountry = byCode.get(hub)?.country;
   const newZone = !!originZone?.schengen !== !!hubCountry?.schengen;
 
+  const where = hubCountry?.name ?? hub;
   const flags = [];
-  if (layover < w.tightBelow) flags.push({ id: 'tight', label: `Only ${layover.toFixed(1)}h to make the transfer` });
-  if (layover > w.longAbove) flags.push({ id: 'long', label: `${Math.round(layover)}h waiting at the airport` });
-  if (overnight) flags.push({ id: 'overnight', label: 'Overnight connection' });
+  if (layover < w.tightBelow) flags.push({ id: 'tight', label: `Only ${layover.toFixed(1)}h in ${hub} to make the transfer` });
+  if (layover > w.longAbove) flags.push({ id: 'long', label: `${Math.round(layover)}h waiting in ${hub}` });
+  if (overnight) flags.push({ id: 'overnight', label: `Overnight stop in ${hub}` });
   flags.push({
     id: newZone ? 'border' : 'entry',
     label: newZone
-      ? `Requires entry to ${hubCountry?.name ?? hub} — outside the Schengen area you started in`
-      : `You clear immigration into ${hubCountry?.name ?? hub}`,
+      ? `Requires entry to ${where} — outside the Schengen area you started in`
+      : `You clear immigration into ${where}`,
   });
-  flags.push({ id: 'bags', label: 'Collect and re-check bags between flights' });
+  flags.push({ id: 'bags', label: `Collect and re-check bags in ${hub}` });
 
   const level = layover < w.tightBelow ? 'risky' : layover < 4.5 ? 'tight' : 'comfortable';
   return { flags, level, overnight, border: newZone };
+}
+
+const RANK = { comfortable: 0, tight: 1, risky: 2 };
+
+/**
+ * Candidate routings from origin to any target, using at most `maxStops` hubs.
+ *
+ * Expanding the graph blindly is not an option — three levels of ~230 airports is
+ * millions of paths and thousands of upstream requests. Two things keep it small:
+ * the set of airports that actually reach a target is known up front (routes are
+ * symmetric, so it comes from the targets' own route lists), and every hop must
+ * make geographic progress, judged against flying straight there.
+ */
+async function buildRoutings({ origin, targets, maxStops, byCode, w, onProgress }) {
+  const km = (a, b) => distanceKm(byCode.get(a), byCode.get(b));
+  const toNearestTarget = (code) => Math.min(...targets.map(t => km(code, t)));
+  const baseline = Math.max(toNearestTarget(origin), 1);
+  const budget = baseline * w.detourFactor;
+
+  const outbound = (await routesFrom(origin)).map(r => r.code);
+
+  // Which airports connect to a target, and to which one.
+  let inboundDone = 0;
+  const arrivals = new Map();
+  await Promise.all(targets.map(async (target) => {
+    for (const r of await routesFrom(target)) {
+      if (!arrivals.has(r.code)) arrivals.set(r.code, new Set());
+      arrivals.get(r.code).add(target);
+    }
+    onProgress({
+      phase: 'inbound', done: ++inboundDone, total: targets.length,
+      label: `Finding what connects to ${byCode.get(target)?.city?.name ?? target}`,
+    });
+  }));
+
+  const routings = [];
+  const seen = new Set();
+  const add = (path, flown) => {
+    const key = path.join('>');
+    if (seen.has(key)) return;
+    seen.add(key);
+    routings.push({ path, stops: path.length - 2, detour: +(flown / baseline).toFixed(2) });
+  };
+
+  /**
+   * Hops still worth taking: somewhere new, making progress toward a target, and
+   * inside the detour budget. Without the `visited` check a routing will happily
+   * fly out to an airport and back again — a real result before this existed.
+   */
+  const viable = (from, flown, candidates, visited) => candidates
+    .filter(c => !visited.includes(c) && !targets.includes(c))
+    .map(c => ({ code: c, flown: flown + km(from, c) }))
+    .filter(c => c.flown + toNearestTarget(c.code) <= budget)
+    .sort((a, b) => (a.flown + toNearestTarget(a.code)) - (b.flown + toNearestTarget(b.code)));
+
+  // One stop.
+  const firstHops = viable(origin, 0, outbound, [origin]);
+  for (const h of firstHops) {
+    for (const t of arrivals.get(h.code) ?? []) {
+      if (h.flown + km(h.code, t) <= budget) add([origin, h.code, t], h.flown + km(h.code, t));
+    }
+  }
+
+  // Two and three stops, expanding only the most promising hubs at each level.
+  if (maxStops >= 2) {
+    const expand = firstHops.slice(0, w.expandFirst);
+    onProgress({ phase: 'deeper', label: `Looking for two-stop routings through ${expand.length} airports` });
+
+    const second = await Promise.all(expand.map(async (h) => ({
+      via: h,
+      routes: (await routesFrom(h.code)).map(r => r.code),
+    })));
+
+    const thirdLevel = [];
+    for (const { via, routes } of second) {
+      for (const h2 of viable(via.code, via.flown, routes, [origin, via.code])) {
+        for (const t of arrivals.get(h2.code) ?? []) {
+          if (h2.flown + km(h2.code, t) <= budget) {
+            add([origin, via.code, h2.code, t], h2.flown + km(h2.code, t));
+          }
+        }
+        if (maxStops >= 3) thirdLevel.push({ prefix: [origin, via.code], hop: h2 });
+      }
+    }
+
+    if (maxStops >= 3 && thirdLevel.length) {
+      const expand3 = thirdLevel
+        .sort((a, b) => (a.hop.flown + toNearestTarget(a.hop.code)) - (b.hop.flown + toNearestTarget(b.hop.code)))
+        .slice(0, w.expandSecond);
+      onProgress({ phase: 'deeper', label: `Looking for three-stop routings through ${expand3.length} airports` });
+
+      await Promise.all(expand3.map(async ({ prefix, hop }) => {
+        for (const h3 of viable(hop.code, hop.flown, (await routesFrom(hop.code)).map(r => r.code), [...prefix, hop.code])) {
+          for (const t of arrivals.get(h3.code) ?? []) {
+            if (h3.flown + km(h3.code, t) <= budget) {
+              add([...prefix, hop.code, h3.code, t], h3.flown + km(h3.code, t));
+            }
+          }
+        }
+      }));
+    }
+  }
+
+  // Budget the work per depth. A flat cap sorted by stop count would be filled
+  // entirely by one- and two-stop routings, and the deeper ones — the only reason
+  // the user asked for more tickets — would never get priced at all.
+  const byDepth = new Map();
+  for (const r of routings) {
+    if (!byDepth.has(r.stops)) byDepth.set(r.stops, []);
+    byDepth.get(r.stops).push(r);
+  }
+  return [...byDepth.keys()].sort((a, b) => a - b).flatMap(stops =>
+    byDepth.get(stops)
+      .sort((a, b) => a.detour - b.detour)
+      .slice(0, w.perDepth[stops] ?? 30));
+}
+
+/** Every viable way to fly one routing, chronologically stitched. */
+function stitch(legsPerHop, w) {
+  let partials = legsPerHop[0].map(leg => ({ legs: [leg], layovers: [] }));
+
+  for (let i = 1; i < legsPerHop.length; i++) {
+    const next = [];
+    for (const partial of partials) {
+      const arrival = partial.legs.at(-1).arr;
+      for (const leg of legsPerHop[i]) {
+        const wait = hours(leg.dep - arrival);
+        if (wait < w.minLayover) continue;
+        if (wait > w.maxLayover) break;            // legs are sorted by departure
+        next.push({ legs: [...partial.legs, leg], layovers: [...partial.layovers, wait] });
+      }
+    }
+    // Keep the cheapest partials only — otherwise a three-stop routing explodes.
+    next.sort((a, b) =>
+      a.legs.reduce((s, l) => s + l.price, 0) - b.legs.reduce((s, l) => s + l.price, 0));
+    partials = next.slice(0, w.maxPartials);
+    if (!partials.length) return [];
+  }
+  return partials;
 }
 
 /**
@@ -165,9 +309,11 @@ function assess(a, b, layover, hub, byCode, w) {
  *   otherwise a country search sits silent for ten seconds before the first hub.
  */
 export async function search({
-  origin, destination, from, to, currency = 'EUR', weights = {}, onProgress = () => {},
+  origin, destination, from, to, currency = 'EUR', maxStops = 1,
+  weights = {}, onProgress = () => {},
 }) {
   const w = { ...DEFAULTS, ...weights };
+  maxStops = Math.min(Math.max(1, Number(maxStops) || 1), 3);   // 2 to 4 tickets
 
   onProgress({ phase: 'airports', label: 'Loading the airport network' });
   const { byCode } = await airportIndex();
@@ -207,94 +353,77 @@ export async function search({
   }))).flat();
   direct.sort((a, b) => a.price - b.price);
 
-  // Candidate hubs: reachable from origin and connected to a target.
-  let inboundDone = 0;
-  const inbound = await Promise.all(targets.map(async (target) => {
-    const routes = await routesFrom(target);
-    onProgress({
-      phase: 'inbound', done: ++inboundDone, total: targets.length,
-      label: `Finding what connects to ${name(target)}`,
-    });
-    return { target, routes };
-  }));
-
-  const candidates = new Map();
-  for (const { target, routes } of inbound) {
-    for (const r of routes) {
-      if (r.code === origin || !outbound.has(r.code)) continue;
-      if (!candidates.has(r.code)) candidates.set(r.code, new Set());
-      candidates.get(r.code).add(target);
-    }
-  }
-
-  // Geographic pruning: the graph allows Vienna to Tangier via Stockholm. Nobody wants it.
-  const ranked = [...candidates.entries()]
-    .map(([hub, reach]) => {
-      const detour = Math.min(...[...reach].map(t => {
-        const straight = distanceKm(byCode.get(origin), byCode.get(t));
-        const viaHub = distanceKm(byCode.get(origin), byCode.get(hub)) +
-                       distanceKm(byCode.get(hub), byCode.get(t));
-        return viaHub / Math.max(straight, 1);
-      }));
-      return { hub, reach: [...reach], detour };
-    })
-    .filter(h => h.detour <= w.detourFactor)
-    .sort((a, b) => a.detour - b.detour)
-    .slice(0, w.maxHubs);
+  const routings = await buildRoutings({ origin, targets, maxStops, byCode, w, onProgress });
 
   onProgress({
-    phase: 'hubs', done: 0, total: ranked.length,
-    label: `${ranked.length} airports could connect you — pricing each one`,
+    phase: 'hubs', done: 0, total: routings.length,
+    label: `${routings.length} routings could get you there — pricing each one`,
   });
 
   const itineraries = [];
   let done = 0;
-  await Promise.all(ranked.map(async ({ hub, reach, detour }) => {
-    const first = await legOptions(origin, hub, window, currency);
-    const firstSchedule = await schedules(origin, hub, window);
-    if (first.length) {
-      for (const t of reach) {
-        const second = await legOptions(hub, t, window, currency);
-        const secondSchedule = await schedules(hub, t, window);
-        for (const a of first) {
-          for (const b of second) {
-            const layover = hours(b.dep - a.arr);
-            if (layover < w.minLayover || layover > w.maxLayover) continue;
-            const { flags, level, overnight, border } = assess(a, b, layover, hub, byCode, w);
-            const price = a.price + b.price;
-            const penalty =
-              (layover < w.tightBelow ? (w.tightBelow - layover) * w.tightPenalty : 0) +
-              (layover > w.longAbove ? (layover - w.longAbove) * w.longPenalty : 0) +
-              (overnight ? w.overnightPenalty : 0) +
-              (border ? w.borderPenalty : 0);
-            itineraries.push({
-              kind: 'connection', hub, hubName: byCode.get(hub)?.name ?? hub,
-              hubCity: byCode.get(hub)?.city?.name, target: t,
-              targetName: byCode.get(t)?.name ?? t,
-              layover: +layover.toFixed(2), level, flags, detour: +detour.toFixed(2),
-              price: +price.toFixed(2), currency: a.currency,
-              total: +hours(b.arr - a.dep).toFixed(2),
-              score: +(price + penalty).toFixed(1),
-              legs: [shape(a, firstSchedule), shape(b, secondSchedule)],
-              // If leg 1 runs late, is there another departure that day? The fare feed
-              // only carries the cheapest flight per day, so this comes from the
-              // published timetable — the only open source that lists every frequency.
-              backup: (() => {
-                const sameDay = secondSchedule[b.day] ?? [];
-                const later = sameDay.find(f => f.dep > b.depLocal.slice(11, 16));
-                return later
-                  ? { depLocal: later.dep, flight: later.number }
-                  : (sameDay.length ? null : undefined);
-              })(),
-            });
-          }
-        }
+
+  await Promise.all(routings.map(async (routing) => {
+    const hops = routing.path.slice(0, -1).map((from_, i) => [from_, routing.path[i + 1]]);
+
+    const [legsPerHop, schedulePerHop] = await Promise.all([
+      Promise.all(hops.map(([a, b]) => legOptions(a, b, window, currency))),
+      Promise.all(hops.map(([a, b]) => schedules(a, b, window))),
+    ]);
+
+    if (legsPerHop.every(l => l.length)) {
+      for (const { legs, layovers } of stitch(legsPerHop, w)) {
+        const hubs = routing.path.slice(1, -1);
+        const target = routing.path.at(-1);
+
+        const perLayover = layovers.map((wait, i) =>
+          assessLayover(legs[i], legs[i + 1], wait, hubs[i], byCode, w));
+
+        const price = legs.reduce((sum, l) => sum + l.price, 0);
+        const penalty = layovers.reduce((sum, wait, i) =>
+          sum
+          + (wait < w.tightBelow ? (w.tightBelow - wait) * w.tightPenalty : 0)
+          + (wait > w.longAbove ? (wait - w.longAbove) * w.longPenalty : 0)
+          + (perLayover[i].overnight ? w.overnightPenalty : 0)
+          + (perLayover[i].border ? w.borderPenalty : 0), 0)
+          // Every extra ticket is another chance for the chain to break, and
+          // another check-in queue. Cheap on paper is not cheap in a terminal.
+          + (legs.length - 1) * w.ticketPenalty;
+
+        itineraries.push({
+          kind: 'connection',
+          stops: hubs.length,
+          tickets: legs.length,
+          hubs,
+          hub: hubs[0],                                   // the month view's label
+          hubCity: byCode.get(hubs[0])?.city?.name,
+          target, targetName: byCode.get(target)?.name ?? target,
+          layovers: layovers.map(v => +v.toFixed(2)),
+          layover: +Math.min(...layovers).toFixed(2),     // the tightest one
+          level: perLayover.map(p => p.level).sort((a, b) => RANK[b] - RANK[a])[0],
+          flags: perLayover.flatMap(p => p.flags),
+          detour: routing.detour,
+          price: +price.toFixed(2), currency: legs[0].currency,
+          total: +hours(legs.at(-1).arr - legs[0].dep).toFixed(2),
+          score: +(price + penalty).toFixed(1),
+          legs: legs.map((leg, i) => shape(leg, schedulePerHop[i])),
+          // If a leg runs late, is there another departure that day? The fare feed
+          // only carries the cheapest flight per day, so this comes from the
+          // published timetable — the only open source listing every frequency.
+          backups: legs.slice(1).map((leg, i) => {
+            const sameDay = schedulePerHop[i + 1][leg.day] ?? [];
+            const later = sameDay.find(f => f.dep > leg.depLocal.slice(11, 16));
+            return later
+              ? { at: hubs[i], depLocal: later.dep, flight: later.number }
+              : (sameDay.length ? null : undefined);
+          }),
+        });
       }
     }
+
     onProgress({
-      phase: 'hubs', done: ++done, total: ranked.length,
-      hub, hubName: byCode.get(hub)?.name ?? hub,
-      label: `${byCode.get(hub)?.name ?? hub} (${hub})`,
+      phase: 'hubs', done: ++done, total: routings.length,
+      label: routing.path.join(' → '),
     });
   }));
 
@@ -309,12 +438,20 @@ export async function search({
     }
   }
 
+  const byStops = {};
+  for (const it of itineraries) byStops[it.stops] = (byStops[it.stops] ?? 0) + 1;
+
   return {
-    origin, targets, from, to, currency,
-    hubs: ranked.map(r => r.hub),
-    direct: direct.slice(0, 20),
-    itineraries: itineraries.slice(0, 200),
+    origin, targets, from, to, currency, maxStops,
+    hubs: [...new Set(routings.flatMap(r => r.path.slice(1, -1)))],
+    direct: direct.slice(0, 40),
+    itineraries: itineraries.slice(0, 400),
     month,
-    meta: { hubsSearched: ranked.length, found: itineraries.length },
+    meta: {
+      routingsSearched: routings.length,
+      hubsSearched: new Set(routings.flatMap(r => r.path.slice(1, -1))).size,
+      found: itineraries.length,
+      byStops,
+    },
   };
 }
