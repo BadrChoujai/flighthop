@@ -58,9 +58,11 @@ export class PlacePicker {
       e.preventDefault();
       this.choose(row.dataset.code);
     });
-    document.addEventListener('mousedown', (e) => {
-      if (!root.contains(e.target)) this.hide();
-    });
+    for (const type of ['mousedown', 'touchstart']) {
+      document.addEventListener(type, (e) => {
+        if (!root.contains(e.target)) this.hide();
+      }, { passive: true });
+    }
   }
 
   /** @param airports from /api/airports */
@@ -209,9 +211,11 @@ export class DateRange {
       const cell = e.target.closest('[data-day]');
       if (this.from && !this.to && cell) { this.hover = cell.dataset.day; this.render(); }
     });
-    document.addEventListener('mousedown', (e) => {
-      if (!root.contains(e.target)) this.hide();
-    });
+    for (const type of ['mousedown', 'touchstart']) {
+      document.addEventListener(type, (e) => {
+        if (!root.contains(e.target)) this.hide();
+      }, { passive: true });
+    }
     this.button.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.hide();
     });

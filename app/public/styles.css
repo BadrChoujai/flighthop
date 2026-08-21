@@ -108,6 +108,10 @@ body {
   from { stroke-dashoffset: var(--len); }
   to { stroke-dashoffset: 0; }
 }
+@keyframes sheet {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
 .rise { animation: rise .5s cubic-bezier(.22, .68, .36, 1) both; }
 
 .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px 96px; }
@@ -160,6 +164,7 @@ header .wrap { padding-bottom: 0; }
   padding: 6px 13px; border-radius: 6px; cursor: pointer; white-space: nowrap;
 }
 .tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.tabs .sm { display: none; }
 
 /* ---------- search bar ---------- */
 .searchbar {
@@ -294,11 +299,13 @@ button.go:disabled { opacity: .55; cursor: default; }
   background: var(--surface); border: 1px solid var(--line);
   border-radius: 14px; padding: 14px; margin-bottom: 20px;
   box-shadow: var(--shadow);
-  animation: rise .4s cubic-bezier(.22,.68,.36,1) both;
-  /* The animation sets a transform, which makes this a stacking context — the
-     airport and date popovers were sealed inside it and painted underneath the
-     results below. Lift the whole panel instead, but keep it under the sticky
-     header so nothing escapes over that when the page scrolls. */
+  /* Deliberately opacity-only. A transform here would make this the containing
+     block for the popovers, which are fixed bottom sheets on mobile — they would
+     anchor to this panel instead of the viewport. It also used to trap them in a
+     stacking context and paint them behind the results, which is what the
+     z-index below fixes; that one is kept under the sticky header so nothing
+     escapes over it when the page scrolls. */
+  animation: fade .4s ease both;
   position: relative;
   z-index: 30;
 }
@@ -868,13 +875,51 @@ footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
   .tabs { margin-left: auto; }
 }
 @media (max-width: 860px) {
-  .hero { grid-template-columns: 1fr; gap: 28px; padding-top: 18px; }
-  .hero-art { order: -1; max-width: 460px; }
+  /* Copy first. The illustration explains the headline — leading with it on a
+     phone means a screenful of diagram before any words. */
+  .hero { grid-template-columns: 1fr; gap: 22px; padding-top: 8px; }
+  .hero-art { max-width: 420px; margin: 0 auto; }
   .closing { flex-direction: column; align-items: flex-start; }
 }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
   header { position: static; }
+
+  /* Header: identity on one line, navigation on the next as one full-width row
+     rather than three stacked fragments with a gap down the middle. */
+  .headrow { flex-wrap: wrap; row-gap: 12px; }
+  .brand { flex: 1; }
+  .themetoggle { order: 2; }
+  /* Shorter labels so navigation fits one row instead of stacking into three. */
+  .tabs { order: 3; flex: 1 1 auto; margin-left: 0; }
+  .tabs button { flex: 1; text-align: center; }
+  .tabs .lg { display: none; }
+  .tabs .sm { display: inline; }
+  .infolink { order: 4; flex: 0 0 auto; }
+
+  /* Every cell filled: two fields, then the date range and the button full width. */
+  .searchbar { grid-template-columns: 1fr 1fr; }
+  .field:first-child { border-radius: 9px 0 0 0; }
+  .field.range { grid-column: span 2; }
+  button.go { grid-column: span 2; padding: 13px; border-radius: 0 0 9px 9px; }
+
+  /* Popovers become bottom sheets. Anchored to a field, a 300px-wide list or a
+     two-month calendar either overflows the screen or falls off the bottom. */
+  .pop {
+    position: fixed; inset: auto 0 0 0; top: auto;
+    width: auto; max-width: none; max-height: 78vh; overflow-y: auto;
+    border-radius: 16px 16px 0 0; border-left: 0; border-right: 0; border-bottom: 0;
+    box-shadow: 0 -14px 40px -14px rgba(0,0,0,.45);
+    z-index: 70;
+    animation: sheet .24s cubic-bezier(.22,.68,.36,1) both;
+  }
+  /* The desktop rule anchors this to the field's right edge; as a sheet it has to
+     span the screen, so both offsets are restated rather than inherited. */
+  .pop-cal { left: 0; right: 0; width: auto; padding: 14px 16px 22px; }
+  .pop-list { width: auto; padding: 6px 6px 20px; }
+  .pop-row { padding: 11px 12px; }        /* a comfortable tap target */
+  .cal-cell { font-size: 14px; }
+  .cal-presets { gap: 7px; }
 
   /* The rail becomes a sheet, so the results stay put while you tune them. */
   .filterfab { display: flex; }
@@ -889,12 +934,7 @@ footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
   body.filters-open .rail { transform: none; }
   .rail-close { display: block; }
   .rail-top { position: sticky; top: 0; background: var(--ground); padding: 4px 2px 10px; z-index: 1; }
-  .stopspicker { flex-direction: column; align-items: flex-start; gap: 9px; }
-  .searchbar { grid-template-columns: 1fr 1fr; }
-  .field:first-child { border-radius: 9px 0 0 0; }
-  button.go { grid-column: span 2; padding: 12px; border-radius: 0 0 9px 9px; }
   .card { grid-template-columns: 1fr; gap: 10px; }
-  .pop-cal { width: calc(100vw - 32px); left: 0; right: auto; }
   .cal-months { grid-template-columns: 1fr; }
   .cal-months .cal-month:last-child { display: none; }
   .tagdoc-row { grid-template-columns: 1fr; gap: 9px; }
