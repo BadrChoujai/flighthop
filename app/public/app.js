@@ -118,37 +118,73 @@ airportsReady.then(() => fetch('/api/where').then(r => r.json())).then(({ known,
   ranges.explore.set(iso(start), iso(end));
 }
 
-/* ---------- tabs ---------- */
+/* The hero arcs draw themselves in. The dash length has to be the real path
+   length, or the line either stops short or starts already visible — so measure
+   it rather than guessing a number in the stylesheet. */
+for (const path of document.querySelectorAll('.art-hop')) {
+  path.style.setProperty('--len', path.getTotalLength());
+}
+
+/* ---------- theme ----------
+   Light is the default. A choice is remembered; no choice means light, whatever
+   the operating system prefers. */
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  $('themeToggle').setAttribute('aria-label',
+    theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+  try { localStorage.setItem('flighthop:theme', theme); } catch { /* session only */ }
+}
+$('themeToggle').onclick = () =>
+  setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+setTheme(document.documentElement.getAttribute('data-theme') ?? 'light');
+
+/* ---------- views ---------- */
+const VIEWS = [
+  ['home', 'view-home', null],
+  ['search', 'view-search', 'searchForm'],
+  ['explore', 'view-explore', 'exploreForm'],
+  ['info', 'view-info', null],
+];
+
 function showTab(which) {
-  for (const [name, view, form] of [
-    ['search', 'view-search', 'searchForm'],
-    ['explore', 'view-explore', 'exploreForm'],
-    ['info', 'view-info', null],
-  ]) {
+  const previous = document.querySelector('[id^="view-"]:not(.hidden)')?.id;
+  for (const [name, view, form] of VIEWS) {
     const on = which === name;
     $(view).classList.toggle('hidden', !on);
     if (form) $(form).classList.toggle('hidden', !on);
   }
-  if (which !== 'info') state.lastSearchView = which;
+  if (which !== 'info') state.lastSearchView = which;   // includes home
+
   $('tab-search').setAttribute('aria-selected', String(which === 'search'));
   $('tab-explore').setAttribute('aria-selected', String(which === 'explore'));
   $('tab-info').setAttribute('aria-pressed', String(which === 'info'));
   $('tab-info').textContent = which === 'info' ? 'Back to search' : 'How it works';
   document.body.classList.toggle('reading', which === 'info');
-  if (which === 'info') scrollTo({ top: 0, behavior: 'smooth' });
+  document.body.classList.toggle('landing', which === 'home');
+
+  // Replay the entrance animation when the view actually changes, so switching
+  // reads as movement rather than an instant swap.
+  if (previous !== `view-${which}`) {
+    const el = $(`view-${which}`);
+    el.classList.remove('rise');
+    void el.offsetWidth;                 // restart the animation
+    el.classList.add('rise');
+    el.addEventListener('animationend', () => el.classList.remove('rise'), { once: true });
+    scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
+
 $('tab-search').onclick = () => showTab('search');
 $('tab-explore').onclick = () => showTab('explore');
 
-// A toggle: pressing it again returns you to whichever search you were on, not
-// always to the first one.
+// A toggle: pressing it again returns you to whichever view you came from.
 $('tab-info').onclick = () => showTab(
   $('tab-info').getAttribute('aria-pressed') === 'true' ? state.lastSearchView : 'info');
 
-$('home').onclick = () => {
-  showTab('search');
-  scrollTo({ top: 0, behavior: 'smooth' });
-};
+$('home').onclick = () => showTab('home');
+$('heroSearch').onclick = () => showTab('search');
+$('heroSearch2').onclick = () => showTab('search');
+$('heroHow').onclick = () => showTab('info');
 
 /* A tag in the results is the natural place to wonder what it means, so make it
    the link to the explanation. */
