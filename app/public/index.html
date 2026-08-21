@@ -190,15 +190,6 @@
         </div>
         <button class="go" type="submit" id="goBtn">Search</button>
       </form>
-      <div class="stopspicker" role="group" aria-label="How many tickets to search">
-        <span class="stopslabel">Search up to</span>
-        <div class="seg-toggle" id="stopsToggle">
-          <button data-stops="1" aria-pressed="true">2 tickets</button>
-          <button data-stops="2" aria-pressed="false">3 tickets</button>
-          <button data-stops="3" aria-pressed="false">4 tickets</button>
-        </div>
-        <span class="stopshint" id="stopsHint">One stop. Fastest to search.</span>
-      </div>
     </div>
 
     <div class="layout">
@@ -224,13 +215,13 @@
 
         <section>
           <h4>Tickets</h4>
-          <div class="chips" id="ticketChips" role="group" aria-label="Number of tickets">
-            <button data-tickets="any" aria-pressed="true">Any</button>
-            <button data-tickets="1" aria-pressed="false">1</button>
-            <button data-tickets="2" aria-pressed="false">2</button>
-            <button data-tickets="3" aria-pressed="false">3</button>
-            <button data-tickets="4" aria-pressed="false">4</button>
+          <div class="chips" id="ticketChips" role="group" aria-label="Most tickets to include">
+            <button data-tickets="1" aria-pressed="false">Direct only</button>
+            <button data-tickets="2" aria-pressed="true">Up to 2</button>
+            <button data-tickets="3" aria-pressed="false">Up to 3</button>
+            <button data-tickets="4" aria-pressed="false">Up to 4</button>
           </div>
+          <p class="chips-note" id="ticketsNote">One stop. Asking for more takes longer to search.</p>
         </section>
 
         <section>

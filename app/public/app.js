@@ -6,10 +6,10 @@ import { PlacePicker, DateRange } from '/components.js';
 const $ = (id) => document.getElementById(id);
 const state = {
   result: null, sort: 'score', pinnedDay: null, expanded: new Set(),
-  page: 1, xrows: [], xpage: 1, lastSearchView: 'search',
-  tickets: 'any', maxStops: 1,
+  shown: 15, xrows: [], xshown: 15, lastSearchView: 'search',
+  maxTickets: 2, loadedStops: null,
 };
-const PER_PAGE = 15;
+const PAGE_SIZE = 15;
 
 /* The values every slider starts at, so "how many filters are active" and
    "clear all" have a single definition to work from. */
@@ -226,28 +226,26 @@ $('sortToggle').addEventListener('click', (e) => {
   rerank();
 });
 
+/* One control for tickets, not two. It sets both how deep the server searches and
+   how much of the answer is shown: asking for more than is loaded re-runs the
+   search, asking for less just narrows what is already here. */
+const TICKETS_NOTE = {
+  1: 'Direct flights only, where they exist at all.',
+  2: 'One stop. Asking for more takes longer to search.',
+  3: 'Up to two stops. Slower, and finds routes one stop cannot.',
+  4: 'Up to three stops. Slowest, and a long day of flying.',
+};
 $('ticketChips').addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-tickets]');
   if (!btn) return;
-  state.tickets = btn.dataset.tickets === 'any' ? 'any' : Number(btn.dataset.tickets);
+  state.maxTickets = Number(btn.dataset.tickets);
   press($('ticketChips'), btn);
-  rerank();
-});
+  $('ticketsNote').textContent = TICKETS_NOTE[state.maxTickets];
+  paintFilterCount();
 
-/* How many tickets to *search* for is a query parameter, not a view filter — it
-   changes what the server looks for, so it re-runs the search. */
-const STOPS_HINT = {
-  1: 'One stop. Fastest to search.',
-  2: 'Up to two stops. Slower, and finds routes one stop cannot.',
-  3: 'Up to three stops. Slowest, and a long day of flying.',
-};
-$('stopsToggle').addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-stops]');
-  if (!btn) return;
-  state.maxStops = Number(btn.dataset.stops);
-  press($('stopsToggle'), btn);
-  $('stopsHint').textContent = STOPS_HINT[state.maxStops];
-  if (state.result) runSearch();     // only re-fetch if there is something to redo
+  const needed = Math.max(1, state.maxTickets - 1);
+  if (state.result && needed > state.loadedStops) runSearch();
+  else rerank();
 });
 
 /* ---------- filter chrome ---------- */
@@ -256,7 +254,7 @@ function activeFilterCount() {
   let n = 0;
   for (const [id, value] of Object.entries(FILTER_DEFAULTS)) if ($(id).value !== value) n++;
   if ($('noOvernight').checked) n++;
-  if (state.tickets !== 'any') n++;
+  if (state.maxTickets !== 2) n++;
   return n;
 }
 
@@ -275,8 +273,9 @@ $('clearFilters').onclick = () => {
     $(id).dispatchEvent(new Event('input'));
   }
   $('noOvernight').checked = false;
-  state.tickets = 'any';
-  press($('ticketChips'), $('ticketChips').firstElementChild);
+  state.maxTickets = 2;
+  press($('ticketChips'), $('ticketChips').querySelector('[data-tickets="2"]'));
+  $('ticketsNote').textContent = TICKETS_NOTE[2];
   rerank();
 };
 
@@ -318,37 +317,15 @@ $('monthReset').onclick = () => {
   rerank();
 };
 
-/* ---------- pagination ----------
-   Shared by both listings. Renders nothing at all for a single page. */
-function renderPager(el, total, current, onGo) {
-  const pages = Math.ceil(total / PER_PAGE);
-  if (pages <= 1) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+/* ---------- load more ----------
+   Shared by both listings. Nothing renders once everything is on screen. */
+function renderLoadMore(el, total, shown, onMore) {
+  if (shown >= total) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  const next = Math.min(PAGE_SIZE, total - shown);
   el.classList.remove('hidden');
-
-  // First, last, and a window around the current page — with gaps marked.
-  const window_ = new Set([1, pages, current, current - 1, current + 1]);
-  if (current <= 3) [2, 3, 4].forEach(n => window_.add(n));
-  if (current >= pages - 2) [pages - 1, pages - 2, pages - 3].forEach(n => window_.add(n));
-  const shown = [...window_].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
-
-  let html = `<button class="pg-step" data-go="${current - 1}" ${current === 1 ? 'disabled' : ''}
-                aria-label="Previous page">‹ Previous</button><span class="pg-nums">`;
-  let prev = 0;
-  for (const n of shown) {
-    if (n - prev > 1) html += '<span class="pg-gap">…</span>';
-    html += `<button class="pg-num${n === current ? ' current' : ''}" data-go="${n}"
-               ${n === current ? 'aria-current="page"' : ''}>${n}</button>`;
-    prev = n;
-  }
-  html += `</span><button class="pg-step" data-go="${current + 1}" ${current === pages ? 'disabled' : ''}
-             aria-label="Next page">Next ›</button>`;
-  el.innerHTML = html;
-
-  el.onclick = (e) => {
-    const btn = e.target.closest('[data-go]');
-    if (!btn || btn.disabled) return;
-    onGo(Number(btn.dataset.go));
-  };
+  el.innerHTML = `<button class="loadmore">Show ${next} more</button>
+    <span class="loadmore-count">${shown} of ${total}</span>`;
+  el.onclick = (e) => { if (e.target.closest('.loadmore')) onMore(shown + PAGE_SIZE); };
 }
 
 /* ---------- search ---------- */
@@ -374,7 +351,7 @@ function runSearch() {
   stream?.close();
   state.pinnedDay = null;
   state.expanded.clear();
-  state.page = 1;
+  state.shown = PAGE_SIZE;
   setPhase('loading');
   $('goBtn').disabled = true;
   $('progressBar').style.width = '0%';
@@ -385,7 +362,7 @@ function runSearch() {
     from: pickers.from.commit(), to: pickers.to.commit(),
     dateFrom: ranges.search.from, dateTo: ranges.search.to,
     minLayover: $('minLayover').value, maxLayover: $('maxLayover').value,
-    maxStops: String(state.maxStops),
+    maxStops: String(Math.max(1, state.maxTickets - 1)),
   });
 
   stream = new EventSource('/api/search?' + q);
@@ -415,6 +392,7 @@ function runSearch() {
 
   stream.addEventListener('result', (e) => {
     state.result = JSON.parse(e.data);
+    state.loadedStops = state.result.maxStops ?? 1;
     stream.close();
     $('goBtn').disabled = false;
     setPhase('done');
@@ -453,7 +431,7 @@ function visible() {
     // Layover limits apply to every connection in the chain, not just the tightest.
     .filter(it => it.kind === 'direct' ||
       it.layovers.every(w => w >= min && w <= max))
-    .filter(it => state.tickets === 'any' || (it.tickets ?? 1) === state.tickets)
+    .filter(it => (it.tickets ?? 1) <= state.maxTickets)
     .filter(it => !cap || it.price <= cap)
     .filter(it => !(hideNight && it.flags?.some(f => f.id === 'overnight')))
     .filter(it => !state.pinnedDay || it.legs[0].depDate === state.pinnedDay)
@@ -479,7 +457,7 @@ function visible() {
    as a function so the rail bindings can call it while the module is still
    evaluating. */
 function rerank() {
-  state.page = 1;
+  state.shown = PAGE_SIZE;
   paintFilterCount();
   render();
 }
@@ -510,17 +488,15 @@ function render() {
       <h3>Nothing matches those limits</h3>
       <p>The cheapest trip that does exist is ${money(Math.min(...[...r.direct, ...r.itineraries].map(i => i.price)) || 0, r.currency)}.
          Try a longer maximum layover, or raise the budget.</p></div>`;
-    renderPager($('pager'), 0, 1, () => {});
+    renderLoadMore($('pager'), 0, 0, () => {});
     return;
   }
 
-  const pages = Math.ceil(rows.length / PER_PAGE);
-  state.page = Math.min(Math.max(1, state.page), pages);
-  const start = (state.page - 1) * PER_PAGE;
-  const page = rows.slice(start, start + PER_PAGE);
+  state.shown = Math.min(Math.max(PAGE_SIZE, state.shown), rows.length);
+  const page = rows.slice(0, state.shown);
 
   $('resultCount').textContent =
-    `${start + 1}–${start + page.length} of ${rows.length} · ${r.meta.hubsSearched} hubs searched` +
+    `${page.length} of ${rows.length} · ${r.meta.hubsSearched} hubs searched` +
     (state.pinnedDay ? ` · ${dayName(state.pinnedDay)} only` : '');
 
   // Bar widths stay comparable across pages by scaling to the whole result set,
@@ -529,10 +505,10 @@ function render() {
   $('results').innerHTML = page.map((it, i) => card(it, i, maxSpan)).join('');
   fitBarLabels();
 
-  renderPager($('pager'), rows.length, state.page, (n) => {
-    state.page = n;
+  // Growing the list must not move what you were already reading, so no scrolling.
+  renderLoadMore($('pager'), rows.length, state.shown, (n) => {
+    state.shown = n;
     render();
-    $('resultHead').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 }
 
@@ -707,16 +683,14 @@ function renderExplore() {
   if (!rows.length) {
     $('xresults').innerHTML = '';
     $('xcount').textContent = '';
-    renderPager($('xpager'), 0, 1, () => {});
+    renderLoadMore($('xpager'), 0, 0, () => {});
     return;
   }
 
-  const pages = Math.ceil(rows.length / PER_PAGE);
-  state.xpage = Math.min(Math.max(1, state.xpage), pages);
-  const start = (state.xpage - 1) * PER_PAGE;
-  const page = rows.slice(start, start + PER_PAGE);
+  state.xshown = Math.min(Math.max(PAGE_SIZE, state.xshown), rows.length);
+  const page = rows.slice(0, state.xshown);
 
-  $('xcount').textContent = `${start + 1}–${start + page.length} of ${rows.length} destinations`;
+  $('xcount').textContent = `${page.length} of ${rows.length} destinations`;
   $('xresults').innerHTML = `<table>
     <thead><tr><th>Fare</th><th>Where</th><th>Country</th><th>Departs</th><th>Flight</th><th></th></tr></thead>
     <tbody>${page.map(r => `<tr>
@@ -728,10 +702,9 @@ function renderExplore() {
       <td><a class="book" href="${r.book}" target="_blank" rel="noopener">Book</a></td>
     </tr>`).join('')}</tbody></table>`;
 
-  renderPager($('xpager'), rows.length, state.xpage, (n) => {
-    state.xpage = n;
+  renderLoadMore($('xpager'), rows.length, state.xshown, (n) => {
+    state.xshown = n;
     renderExplore();
-    $('xhead').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 }
 
@@ -763,7 +736,7 @@ $('exploreForm').addEventListener('submit', async (e) => {
     $('xtitle').textContent = `${airports.find(a => a.code === data.origin)?.city ?? data.origin} → ${scope} under €${$('xmax').value}`;
 
     state.xrows = data.rows;
-    state.xpage = 1;
+    state.xshown = PAGE_SIZE;
     renderExplore();
 
     if (!data.rows.length) {
