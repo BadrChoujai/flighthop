@@ -297,14 +297,21 @@ $('clearFilters').onclick = () => {
 };
 
 // On a narrow screen the rail becomes a sheet over the results.
-$('filterFab').onclick = () => {
-  document.body.classList.add('filters-open');
-  $('filterFab').setAttribute('aria-expanded', 'true');
+const setFilters = (open) => {
+  document.body.classList.toggle('filters-open', open);
+  $('filterFab').setAttribute('aria-expanded', String(open));
 };
-$('closeFilters').onclick = () => {
-  document.body.classList.remove('filters-open');
-  $('filterFab').setAttribute('aria-expanded', 'false');
-};
+$('filterFab').onclick = () => setFilters(true);
+$('closeFilters').onclick = () => setFilters(false);
+
+// Tapping the dimmed page behind the sheet closes it, as any sheet should.
+addEventListener('click', (e) => {
+  if (!document.body.classList.contains('filters-open')) return;
+  if (!e.target.closest('#rail') && !e.target.closest('#filterFab')) setFilters(false);
+});
+addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.body.classList.contains('filters-open')) setFilters(false);
+});
 
 bind('xmax', 'xmaxOut', v => `€${v}`);
 bind('xafter', 'xafterOut', v => (Number(v) === 0 ? 'any' : `${String(v).padStart(2, '0')}:00`));

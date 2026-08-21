@@ -207,7 +207,15 @@ export class DateRange {
 
     this.button.addEventListener('click', () => (this.open ? this.hide() : this.show()));
     this.pop.addEventListener('click', (e) => this.onClick(e));
-    this.pop.addEventListener('mouseover', (e) => {
+    /*
+     * Range preview on hover — mouse only, deliberately.
+     *
+     * A tap emits a synthetic mouseover before its click. Re-rendering here threw
+     * away the very cell that was about to be clicked, so on a touch screen the
+     * second date could never be chosen at all.
+     */
+    this.pop.addEventListener('pointerover', (e) => {
+      if (e.pointerType !== 'mouse') return;
       const cell = e.target.closest('[data-day]');
       if (this.from && !this.to && cell) { this.hover = cell.dataset.day; this.render(); }
     });

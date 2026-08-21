@@ -291,6 +291,9 @@ button.go:disabled { opacity: .55; cursor: default; }
 
 /* ---------- layout ---------- */
 .layout { display: grid; grid-template-columns: 232px 1fr; gap: 24px; margin-top: 24px; align-items: start; }
+/* Grid children default to min-width:auto, so a wide table stretches the column
+   and takes the whole page sideways with it instead of scrolling inside. */
+.layout > * { min-width: 0; }
 
 /* ---------- search panel ----------
    The search belongs with the results it produces, not stranded in the header
@@ -905,9 +908,14 @@ footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
 
   /* Popovers become bottom sheets. Anchored to a field, a 300px-wide list or a
      two-month calendar either overflows the screen or falls off the bottom. */
+  /* Safari zooms the page whenever a focused input is under 16px, which throws
+     the layout off and makes the sheet behind it hard to scroll. 16px exactly. */
+  .field input, .field .range-btn { font-size: 16px; }
+
   .pop {
     position: fixed; inset: auto 0 0 0; top: auto;
-    width: auto; max-width: none; max-height: 78vh; overflow-y: auto;
+    width: auto; max-width: none; max-height: 78vh;
+    overflow-y: auto; overscroll-behavior: contain;
     border-radius: 16px 16px 0 0; border-left: 0; border-right: 0; border-bottom: 0;
     box-shadow: 0 -14px 40px -14px rgba(0,0,0,.45);
     z-index: 70;
@@ -921,6 +929,47 @@ footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
   .cal-cell { font-size: 14px; }
   .cal-presets { gap: 7px; }
 
+  /* ---------- destinations as cards ----------
+     Six columns of a table cannot fit a phone; it scrolled sideways and dragged
+     the page with it. Same markup, laid out as a card per destination. */
+  #xresults table, #xresults tbody, #xresults tr, #xresults td { display: block; }
+  #xresults table { border: 0; background: none; border-radius: 0; overflow: visible; }
+  #xresults thead { display: none; }
+  #xresults .scroll, .scroll { overflow-x: visible; }
+
+  #xresults tr {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "fare where   book"
+      "fare country book"
+      "when when    flight";
+    column-gap: 13px; row-gap: 2px;
+    background: var(--surface);
+    border: 1px solid var(--line); border-radius: 12px;
+    padding: 13px 14px; margin-bottom: 10px;
+  }
+  #xresults tr:hover { background: var(--surface); }
+  #xresults td { border: 0; padding: 0; }
+
+  #xresults td:nth-child(1) {
+    grid-area: fare; align-self: center;
+    font-size: 19px; letter-spacing: -.02em;
+    padding-right: 3px;
+  }
+  #xresults td:nth-child(2) { grid-area: where; font-size: 15px; }
+  #xresults td:nth-child(3) { grid-area: country; font-size: 13px; }
+  #xresults td:nth-child(4) {
+    grid-area: when; margin-top: 9px; padding-top: 9px;
+    border-top: 1px solid var(--line-soft);
+  }
+  #xresults td:nth-child(5) {
+    grid-area: flight; margin-top: 9px; padding-top: 9px;
+    border-top: 1px solid var(--line-soft); text-align: right;
+  }
+  #xresults td:nth-child(6) { grid-area: book; align-self: center; }
+  #xresults .book { margin-top: 0; padding: 9px 15px; }
+
   /* The rail becomes a sheet, so the results stay put while you tune them. */
   .filterfab { display: flex; }
   .rail {
@@ -930,8 +979,17 @@ footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
     border-radius: 16px 16px 0 0; padding: 16px 16px 28px;
     box-shadow: 0 -12px 40px -12px rgba(0,0,0,.35);
     transform: translateY(102%); transition: transform .28s cubic-bezier(.22,.68,.36,1);
+    overscroll-behavior: contain;      /* reaching the end must not scroll the page */
   }
   body.filters-open .rail { transform: none; }
+
+  /* The page behind a sheet stays put until the sheet is closed. */
+  body.filters-open { overflow: hidden; }
+  body.filters-open::before {
+    content: ""; position: fixed; inset: 0; z-index: 59;
+    background: rgba(0, 0, 0, .38);
+    animation: fade .24s ease both;
+  }
   .rail-close { display: block; }
   .rail-top { position: sticky; top: 0; background: var(--ground); padding: 4px 2px 10px; z-index: 1; }
   .card { grid-template-columns: 1fr; gap: 10px; }
