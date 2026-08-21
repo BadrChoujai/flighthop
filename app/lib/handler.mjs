@@ -11,6 +11,36 @@ import { stats } from './cache.mjs';
 
 const publicDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
+const isoDay = (d) => d.toISOString().slice(0, 10);
+
+/**
+ * The next N actual weekends, each as its own tight window.
+ *
+ * Asking the fare endpoint for a two-month span returns the cheapest trip per
+ * destination, which is usually a fortnight — a true answer to a question
+ * nobody asked. "Any weekend" has to mean weekends, so each one is queried on
+ * its own dates: out Friday or Saturday, home on the Sunday.
+ */
+function weekendWindows(count, fromISO) {
+  const now = fromISO ? new Date(fromISO + 'T00:00:00Z') : new Date();
+  const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const isoDow = ((day.getUTCDay() + 6) % 7) + 1;          // Mon = 1 … Sun = 7
+  day.setUTCDate(day.getUTCDate() + ((5 - isoDow + 7) % 7)); // forward to Friday
+
+  const windows = [];
+  for (let i = 0; i < count; i++) {
+    const friday = new Date(day);
+    friday.setUTCDate(friday.getUTCDate() + i * 7);
+    const saturday = new Date(friday); saturday.setUTCDate(saturday.getUTCDate() + 1);
+    const sunday = new Date(friday); sunday.setUTCDate(sunday.getUTCDate() + 2);
+    windows.push({
+      outFrom: isoDay(friday), outTo: isoDay(saturday),
+      backFrom: isoDay(sunday), backTo: isoDay(sunday),
+    });
+  }
+  return windows;
+}
+
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -131,16 +161,26 @@ export default async function handler(req, res) {
       const origin = (q.get('from') ?? '').toUpperCase();
       if (!origin) return json(res, 400, { message: 'Where are you starting from?' });
 
-      const data = await roundTripFares(origin, {
-        outFrom: q.get('outFrom'), outTo: q.get('outTo'),
-        backFrom: q.get('backFrom'), backTo: q.get('backTo'),
+      const filters = {
         maxPrice: q.get('maxPrice') ? Number(q.get('maxPrice')) : undefined,
         outAfter: q.get('outAfter') || undefined,
         outBefore: q.get('outBefore') || undefined,
         backAfter: q.get('backAfter') || undefined,
         backBefore: q.get('backBefore') || undefined,
         currency: q.get('currency') ?? 'EUR',
-      });
+      };
+      const weekends = Math.min(Math.max(0, Number(q.get('weekends') ?? 0)), 10);
+
+      // One request per weekend, run together — they share the cache and the
+      // same concurrency gate as everything else.
+      const windows = weekends
+        ? weekendWindows(weekends, q.get('outFrom'))
+        : [{ outFrom: q.get('outFrom'), outTo: q.get('outTo'),
+             backFrom: q.get('backFrom'), backTo: q.get('backTo') }];
+
+      const sets = await Promise.all(
+        windows.map(w => roundTripFares(origin, { ...w, ...filters })));
+      const data = { fares: sets.flatMap(set => set.fares ?? []) };
 
       const wanted = q.get('country') ? await resolveTargets(q.get('country')) : null;
       const codes = wanted ? new Set(wanted) : null;
@@ -180,6 +220,16 @@ export default async function handler(req, res) {
         });
       }
 
+      if (weekends) {
+        const best = new Map();
+        for (const r of rows) {
+          const seen = best.get(r.code);
+          if (!seen || r.price < seen.price) best.set(r.code, r);
+        }
+        rows.length = 0;
+        rows.push(...best.values());
+      }
+
       rows.sort((a, b) => a.price - b.price);
 
       /*
@@ -211,7 +261,7 @@ export default async function handler(req, res) {
         }
       }
 
-      return json(res, 200, { origin, homeZone, rows, cheapestThatFits });
+      return json(res, 200, { origin, homeZone, rows, cheapestThatFits, weekends });
     }
 
     // "Anywhere under €X" — one upstream call.

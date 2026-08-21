@@ -989,10 +989,12 @@ function weekendDates(which) {
   return { from: iso(friday), to: iso(sunday) };
 }
 
+const ANY_WEEKENDS = 8;
+
 const WHEN_HINT = {
   this: 'Out Friday evening, back Sunday.',
   next: 'The weekend after this one.',
-  any: 'Any weekend in the next two months — cheapest wins.',
+  any: `Every weekend for the next ${ANY_WEEKENDS} — each one priced on its own dates.`,
   custom: 'Your dates. The trip can be as long as the window allows.',
 };
 
@@ -1004,10 +1006,11 @@ function applyWhenPreset(which) {
     const { from, to } = weekendDates(which);
     ranges.getaway.set(from, to);
   } else if (which === 'any') {
-    const start = new Date();
-    const end = new Date(start);
-    end.setUTCDate(end.getUTCDate() + 60);
-    ranges.getaway.set(iso(start), iso(end));
+    // Shown as the span it covers; the search itself asks weekend by weekend.
+    const { from } = weekendDates('this');
+    const last = new Date(from + 'T00:00:00Z');
+    last.setUTCDate(last.getUTCDate() + (ANY_WEEKENDS - 1) * 7 + 2);
+    ranges.getaway.set(from, iso(last));
   }
 }
 
@@ -1064,6 +1067,7 @@ $('getawayForm').addEventListener('submit', async (e) => {
     backFrom: ranges.getaway.from, backTo: ranges.getaway.to,
     maxPrice: $('gmax').value,
   });
+  if (state.whenPreset === 'any') q.set('weekends', String(ANY_WEEKENDS));
   if ($('gout').value) { q.set('outAfter', $('gout').value); q.set('outBefore', '23:59'); }
   if ($('gback').value) { q.set('backAfter', '00:00'); q.set('backBefore', $('gback').value); }
   if (pickers.gcountry.commit()) q.set('country', pickers.gcountry.value);
@@ -1110,7 +1114,8 @@ function renderGetaway() {
 
   state.gshown = Math.min(Math.max(PAGE_SIZE, state.gshown), rows.length);
   const page = rows.slice(0, state.gshown);
-  $('gcount').textContent = `${page.length} of ${rows.length} places you could go`;
+  $('gcount').textContent = `${page.length} of ${rows.length} places you could go` +
+    (state.whenPreset === 'any' ? ` · best of ${ANY_WEEKENDS} weekends` : '');
 
   $('gresults').innerHTML = page.map(r => `
     <div class="card card-getaway">
