@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
 const state = {
   result: null, sort: 'score', pinnedDay: null, expanded: new Set(),
   shown: 15, xrows: [], xshown: 15, lastSearchView: 'search',
-  maxTickets: 2, loadedStops: null,
+  maxTickets: 2, loadedStops: null, trip: 'one',
 };
 const PAGE_SIZE = 15;
 
@@ -99,6 +99,7 @@ const pickers = {
 };
 const ranges = {
   search: new DateRange($('rangePicker')),
+  return: new DateRange($('returnPicker')),
   explore: new DateRange($('xrangePicker')),
 };
 
@@ -126,6 +127,13 @@ airportsReady.then(() => fetch('/api/where').then(r => r.json())).then(({ known,
   end.setUTCDate(end.getUTCDate() + 30);
   ranges.search.set(iso(start), iso(end));
   ranges.explore.set(iso(start), iso(end));
+
+  // A plausible week away, so the return field is never empty when it appears.
+  const back = new Date(start);
+  back.setUTCDate(back.getUTCDate() + 7);
+  const backEnd = new Date(back);
+  backEnd.setUTCDate(backEnd.getUTCDate() + 14);
+  ranges.return.set(iso(back), iso(backEnd));
 }
 
 /* The hero arcs draw themselves in. The dash length has to be the real path
@@ -191,6 +199,29 @@ $('tab-explore').onclick = () => showTab('explore');
 $('tab-info').onclick = () => showTab(
   $('tab-info').getAttribute('aria-pressed') === 'true' ? state.lastSearchView : 'info');
 
+/* Swapping is the fastest way to search the way home, so it swaps the chosen
+   places rather than just the visible text. */
+$('swap').onclick = () => {
+  const a = pickers.from.commit(), b = pickers.to.commit();
+  if (a) pickers.to.choose(a, { silent: true }); else pickers.to.clear();
+  if (b) pickers.from.choose(b, { silent: true }); else pickers.from.clear();
+  $('swap').classList.remove('spin');
+  void $('swap').offsetWidth;
+  $('swap').classList.add('spin');
+};
+
+$('tripToggle').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-trip]');
+  if (!btn) return;
+  state.trip = btn.dataset.trip;
+  press($('tripToggle'), btn);
+  const round = state.trip === 'round';
+  $('returnPicker').classList.toggle('hidden', !round);
+  $('searchForm').classList.toggle('round', round);
+  $('outLabel').textContent = round ? 'Going out' : 'When';
+  paintTicketsNote();
+});
+
 $('home').onclick = () => showTab('home');
 $('heroSearch').onclick = () => showTab('search');
 $('heroSearch2').onclick = () => showTab('search');
@@ -234,6 +265,11 @@ $('sortToggle').addEventListener('click', (e) => {
 /* One control for tickets, not two. It sets both how deep the server searches and
    how much of the answer is shown: asking for more than is loaded re-runs the
    search, asking for less just narrows what is already here. */
+function paintTicketsNote() {
+  const perDirection = state.trip === 'round' ? ' Counted each way.' : '';
+  $('ticketsNote').textContent = TICKETS_NOTE[state.maxTickets] + perDirection;
+}
+
 const TICKETS_NOTE = {
   1: 'Direct flights only, where they exist at all.',
   2: 'One stop. Asking for more takes longer to search.',
@@ -245,7 +281,7 @@ $('ticketChips').addEventListener('click', (e) => {
   if (!btn) return;
   state.maxTickets = Number(btn.dataset.tickets);
   press($('ticketChips'), btn);
-  $('ticketsNote').textContent = TICKETS_NOTE[state.maxTickets];
+  paintTicketsNote();
   paintFilterCount();
 
   const needed = Math.max(1, state.maxTickets - 1);
@@ -297,7 +333,7 @@ $('clearFilters').onclick = () => {
   $('noOvernight').checked = false;
   state.maxTickets = 2;
   press($('ticketChips'), $('ticketChips').querySelector('[data-tickets="2"]'));
-  $('ticketsNote').textContent = TICKETS_NOTE[2];
+  paintTicketsNote();
   rerank();
 };
 
@@ -392,6 +428,9 @@ function runSearch() {
     dateFrom: ranges.search.from, dateTo: ranges.search.to,
     minLayover: $('minLayover').value, maxLayover: $('maxLayover').value,
     maxStops: String(Math.max(1, state.maxTickets - 1)),
+    ...(state.trip === 'round'
+      ? { returnFrom: ranges.return.from, returnTo: ranges.return.to }
+      : {}),
   });
 
   stream = new EventSource('/api/search?' + q);
@@ -456,19 +495,32 @@ function visible() {
   const tight = Number($('tightPenalty').value);
   const long = Number($('longPenalty').value);
 
-  const scored = [...r.direct, ...r.itineraries]
+  const legsOf = (it) => it.kind === 'return' ? [...it.out.legs, ...it.back.legs] : it.legs;
+  const waitsOf = (it) => it.kind === 'return'
+    ? [...(it.out.layovers ?? []), ...(it.back.layovers ?? [])]
+    : (it.layovers ?? []);
+  const flagsOf = (it) => it.kind === 'return'
+    ? [...(it.out.flags ?? []), ...(it.back.flags ?? [])]
+    : (it.flags ?? []);
+
+  const pool = r.roundTrip ? (r.trips ?? []) : [...r.direct, ...r.itineraries];
+
+  const scored = pool
     // Layover limits apply to every connection in the chain, not just the tightest.
-    .filter(it => it.kind === 'direct' ||
-      it.layovers.every(w => w >= min && w <= max))
-    .filter(it => (it.tickets ?? 1) <= state.maxTickets)
+    .filter(it => waitsOf(it).every(w => w >= min && w <= max))
+    // Tickets are counted per direction: a return trip with one stop each way is
+    // four tickets in total, but it is still "up to 2" as far as this filter goes.
+    .filter(it => (it.kind === 'return'
+      ? Math.max(it.out.legs.length, it.back.legs.length)
+      : (it.tickets ?? 1)) <= state.maxTickets)
     .filter(it => !cap || it.price <= cap)
-    .filter(it => !(hideNight && it.flags?.some(f => f.id === 'overnight')))
-    .filter(it => !state.pinnedDay || it.legs[0].depDate === state.pinnedDay)
+    .filter(it => !(hideNight && flagsOf(it).some(f => f.id === 'overnight')))
+    .filter(it => !state.pinnedDay || legsOf(it)[0].depDate === state.pinnedDay)
     .map(it => {
       if (it.kind === 'direct') return { ...it, score: it.price };
-      const overnight = it.flags.some(f => f.id === 'overnight');
-      const border = it.flags.some(f => f.id === 'border');
-      const penalty = it.layovers.reduce((sum, wait) =>
+      const overnight = flagsOf(it).some(f => f.id === 'overnight');
+      const border = flagsOf(it).some(f => f.id === 'border');
+      const penalty = waitsOf(it).reduce((sum, wait) =>
         sum
         + (wait < 3 ? (3 - wait) * tight : 0)
         + (wait > 8 ? (wait - 8) * long : 0), 0)
@@ -530,7 +582,8 @@ function render() {
 
   // Bar widths stay comparable across pages by scaling to the whole result set,
   // not to whichever trips happen to be on screen.
-  const maxSpan = Math.max(...rows.map(i => i.total));
+  const maxSpan = Math.max(...rows.map(i =>
+    i.kind === 'return' ? Math.max(i.out.total, i.back.total) : i.total));
   $('results').innerHTML = page.map((it, i) => card(it, i, maxSpan)).join('');
   fitBarLabels();
 
@@ -562,7 +615,54 @@ function barSegments(it, seg) {
   return html;
 }
 
+function trackFor(it, maxSpan, seg) {
+  const width = Math.max(18, (it.total / maxSpan) * 100);
+  const legLine = it.legs.map((l, n) => {
+    const flight = `<b>${l.from} ${l.depLocal}</b> → <b>${l.to} ${l.arrLocal}</b>`;
+    const wait = it.layovers?.[n];
+    return wait === undefined ? flight
+      : `${flight} &nbsp;·&nbsp; <span class="wait-inline">wait ${hrs(wait)}</span>`;
+  }).join(' &nbsp;·&nbsp; ');
+  const chip = it.kind === 'direct'
+    ? '<span class="chip chip-direct">direct</span>'
+    : `<span class="chip chip-${it.level}">${it.level}</span>`;
+  return `<div class="track">
+    <div class="bars" style="width:${width}%">${barSegments(it, seg)}</div>
+    <div class="legs">
+      <span>${legLine}</span>
+      <span>${chip} &nbsp; ${hrs(it.total)} door to door</span>
+    </div>
+  </div>`;
+}
+
+function returnCard(it, i, maxSpan, seg) {
+  const id = `return-${it.out.legs.map(l => l.from + l.day + l.depLocal).join('-')}-${it.back.legs[0].day}`;
+  const open = state.expanded.has(id);
+  const arrival = it.out.legs.at(-1).to;
+
+  return `<div class="card card-return ${open ? 'open' : ''}" data-id="${id}" data-i="${i}">
+    <div class="price">${money(it.price, it.currency)}
+      <span class="dest">${cityOf(arrival)} <span class="code">${arrival}</span></span>
+      <small>${dayName(it.out.legs[0].depDate)} · ${it.nights} night${it.nights === 1 ? '' : 's'}</small>
+      <span class="ticketpill">${it.tickets} tickets</span>
+    </div>
+    <div class="legsstack">
+      <div class="dirrow"><span class="dir">Out</span>${trackFor(it.out, maxSpan, seg)}</div>
+      <div class="dirrow"><span class="dir dir-back">Back</span>${trackFor(it.back, maxSpan, seg)}</div>
+    </div>
+    ${open ? `<div class="detail">
+      <div class="detail-part"><span class="k">Outbound</span>${detail(it.out)}</div>
+      <div class="detail-part"><span class="k">Return</span>${detail(it.back)}</div>
+    </div>` : ''}
+  </div>`;
+}
+
 function card(it, i, maxSpan) {
+  const seg0 = (cls, flex, labels) =>
+    `<div class="seg ${cls}" style="flex:${flex}" data-flex="${flex}"
+          data-labels='${JSON.stringify(labels).replace(/'/g, '&apos;')}'><b></b></div>`;
+  if (it.kind === 'return') return returnCard(it, i, maxSpan, seg0);
+
   const id = `${it.kind}-${it.legs.map(l => l.from + l.day + l.depLocal).join('-')}`;
   const open = state.expanded.has(id);
   const width = Math.max(18, (it.total / maxSpan) * 100);

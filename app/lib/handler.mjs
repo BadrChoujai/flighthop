@@ -89,6 +89,8 @@ export default async function handler(req, res) {
         to: q.get('dateTo'),
         currency: q.get('currency') ?? 'EUR',
         maxStops: Number(q.get('maxStops') ?? 1),
+        returnFrom: q.get('returnFrom') || undefined,
+        returnTo: q.get('returnTo') || undefined,
         weights: {
           minLayover: Number(q.get('minLayover') ?? 2),
           maxLayover: Number(q.get('maxLayover') ?? 18),

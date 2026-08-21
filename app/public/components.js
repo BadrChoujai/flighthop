@@ -99,6 +99,13 @@ export class PlacePicker {
     if (!silent) this.input.dispatchEvent(new CustomEvent('picked', { bubbles: true, detail: { code } }));
   }
 
+  clear() {
+    this.value = '';
+    this.query = '';
+    this.input.value = '';
+    this.hide();
+  }
+
   /**
    * Resolve whatever is typed to a real place, for submit handlers. Someone who
    * types "vienna" and hits Search without touching the list means Vienna — not

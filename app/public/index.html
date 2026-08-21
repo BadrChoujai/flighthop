@@ -175,17 +175,33 @@
   <!-- ============ SEARCH ============ -->
   <div id="view-search" class="hidden">
     <div class="searchpanel">
+      <div class="triptype" role="group" aria-label="Trip type">
+        <div class="seg-toggle" id="tripToggle">
+          <button data-trip="one" aria-pressed="true">One way</button>
+          <button data-trip="round" aria-pressed="false">Round trip</button>
+        </div>
+      </div>
       <form class="searchbar" id="searchForm">
         <div class="field picker" id="fromPicker">
           <label for="from">From</label>
           <input id="from" placeholder="Where are you flying from?" required />
         </div>
         <div class="field picker" id="toPicker">
+          <button type="button" class="swap" id="swap" title="Swap origin and destination"
+                  aria-label="Swap origin and destination">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 7h11l-3-3M17 17H6l3 3" />
+            </svg>
+          </button>
           <label for="to">To</label>
           <input id="to" placeholder="Anywhere, or a country" required />
         </div>
         <div class="field range" id="rangePicker">
-          <label>When</label>
+          <label id="outLabel">When</label>
+          <button type="button" class="range-btn"><span class="range-value">Pick dates</span></button>
+        </div>
+        <div class="field range hidden" id="returnPicker">
+          <label>Coming back</label>
           <button type="button" class="range-btn"><span class="range-value">Pick dates</span></button>
         </div>
         <button class="go" type="submit" id="goBtn">Search</button>

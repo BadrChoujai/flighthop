@@ -13,6 +13,10 @@ export const DEFAULTS = {
   expandSecond: 12,   // second-level hubs expanded when looking for three
   maxPartials: 300,   // stitched part-itineraries kept per routing, cheapest first
   ticketPenalty: 20,  // € per extra ticket: more chances for the chain to break
+  maxReturnOrigins: 4, // airports the return search flies home from
+  pairEachSide: 60,   // itineraries per direction considered when pairing
+  maxPairs: 400,      // return trips kept
+  minStay: 4,         // hours on the ground before the flight home can leave
   tightBelow: 3,      // hours; comfort starts here
   longAbove: 8,
   tightPenalty: 25,   // € per hour under tightBelow
@@ -308,24 +312,9 @@ function stitch(legsPerHop, w) {
  *   has to be built before any hub can be priced, so the early phases report too —
  *   otherwise a country search sits silent for ten seconds before the first hub.
  */
-export async function search({
-  origin, destination, from, to, currency = 'EUR', maxStops = 1,
-  weights = {}, onProgress = () => {},
-}) {
-  const w = { ...DEFAULTS, ...weights };
-  maxStops = Math.min(Math.max(1, Number(maxStops) || 1), 3);   // 2 to 4 tickets
-
-  onProgress({ phase: 'airports', label: 'Loading the airport network' });
-  const { byCode } = await airportIndex();
+/** Everything that can fly one direction, priced and ranked. */
+async function oneWay({ origin, targets, window, currency, maxStops, w, byCode, onProgress }) {
   const name = (code) => byCode.get(code)?.city?.name ?? byCode.get(code)?.name ?? code;
-
-  origin = origin.trim().toUpperCase();
-  if (!byCode.has(origin)) throw Object.assign(new Error(`Unknown origin ${origin}`), { code: 400 });
-
-  const targets = await resolveTargets(destination);
-  if (!targets.length) throw Object.assign(new Error(`No airport matches "${destination}"`), { code: 400 });
-
-  const window = { from, to };
 
   onProgress({ phase: 'graph', label: `Mapping every route out of ${name(origin)}` });
   const outbound = new Set((await routesFrom(origin)).map(r => r.code));
@@ -442,16 +431,146 @@ export async function search({
   for (const it of itineraries) byStops[it.stops] = (byStops[it.stops] ?? 0) + 1;
 
   return {
-    origin, targets, from, to, currency, maxStops,
     hubs: [...new Set(routings.flatMap(r => r.path.slice(1, -1)))],
     direct: direct.slice(0, 40),
     itineraries: itineraries.slice(0, 400),
     month,
+    routingsSearched: routings.length,
+    byStops,
+  };
+}
+
+/**
+ * A search in one or both directions.
+ *
+ * A return trip is two one-way searches paired up, not a different algorithm.
+ * The expensive part is pricing routes, so the two directions run concurrently
+ * and share one cache and one concurrency gate — and the return leg only departs
+ * from airports the outbound search actually reached.
+ */
+export async function search({
+  origin, destination, from, to, returnFrom, returnTo,
+  currency = 'EUR', maxStops = 1, weights = {}, onProgress = () => {},
+}) {
+  const w = { ...DEFAULTS, ...weights };
+  maxStops = Math.min(Math.max(1, Number(maxStops) || 1), 3);   // 2 to 4 tickets
+  const roundTrip = !!(returnFrom && returnTo);
+
+  onProgress({ phase: 'airports', label: 'Loading the airport network' });
+  const { byCode } = await airportIndex();
+
+  origin = origin.trim().toUpperCase();
+  if (!byCode.has(origin)) throw Object.assign(new Error(`Unknown origin ${origin}`), { code: 400 });
+
+  const targets = await resolveTargets(destination);
+  if (!targets.length) throw Object.assign(new Error(`No airport matches "${destination}"`), { code: 400 });
+
+  const window = { from, to };
+  const shared = { currency, maxStops, w, byCode, onProgress };
+
+  const out = await oneWay({ origin, targets, window, ...shared });
+
+  const base = {
+    origin, targets, from, to, currency, maxStops,
+    roundTrip, returnFrom: returnFrom ?? null, returnTo: returnTo ?? null,
+  };
+
+  if (!roundTrip) {
+    return {
+      ...base,
+      hubs: out.hubs,
+      direct: out.direct,
+      itineraries: out.itineraries,
+      month: out.month,
+      meta: {
+        routingsSearched: out.routingsSearched,
+        hubsSearched: out.hubs.length,
+        found: out.itineraries.length,
+        byStops: out.byStops,
+      },
+    };
+  }
+
+  // Only fly home from somewhere the outbound actually lands, cheapest first.
+  const landed = [...new Set([...out.direct, ...out.itineraries]
+    .sort((a, b) => a.price - b.price)
+    .map(it => it.legs.at(-1).to))].slice(0, w.maxReturnOrigins);
+
+  if (!landed.length) {
+    return { ...base, hubs: out.hubs, direct: [], itineraries: [], trips: [], month: {},
+             meta: { routingsSearched: out.routingsSearched, hubsSearched: out.hubs.length,
+                     found: 0, byStops: {}, returnOrigins: [] } };
+  }
+
+  onProgress({ phase: 'return', label: `Finding the way home from ${landed.length} airport${landed.length === 1 ? '' : 's'}` });
+
+  const returnWindow = { from: returnFrom, to: returnTo };
+  const backs = await Promise.all(landed.map(async (code) => ({
+    code,
+    result: await oneWay({ origin: code, targets: [origin], window: returnWindow, ...shared }),
+  })));
+
+  const home = new Map(backs.map(b => [b.code, [...b.result.direct, ...b.result.itineraries]]));
+
+  // Pair each outbound with a return that leaves after you have arrived. Both
+  // sides are capped first — the full cross product is tens of thousands of rows
+  // that nobody will ever scroll to.
+  const trips = [];
+  const outbounds = [...out.direct, ...out.itineraries]
+    .sort((a, b) => a.score - b.score).slice(0, w.pairEachSide);
+
+  for (const o of outbounds) {
+    const arrival = o.legs.at(-1);
+    const arrivedAt = new Date(`${arrival.arrDate}T${arrival.arrLocal}:00Z`);
+    const candidates = (home.get(arrival.to) ?? [])
+      .sort((a, b) => a.score - b.score).slice(0, w.pairEachSide);
+
+    for (const b of candidates) {
+      const departs = new Date(`${b.legs[0].depDate}T${b.legs[0].depLocal}:00Z`);
+      const stay = (departs - arrivedAt) / 3_600_000;
+      if (stay < w.minStay) continue;
+      trips.push({
+        kind: 'return',
+        out: o, back: b,
+        target: arrival.to,
+        stay: +stay.toFixed(1),
+        nights: Math.max(0, Math.round(stay / 24)),
+        tickets: o.legs.length + b.legs.length,
+        price: +(o.price + b.price).toFixed(2),
+        currency: o.currency,
+        total: +(o.total + b.total).toFixed(2),
+        score: +(o.score + b.score).toFixed(1),
+        level: RANK[o.level ?? 'comfortable'] >= RANK[b.level ?? 'comfortable']
+          ? (o.level ?? 'comfortable') : (b.level ?? 'comfortable'),
+      });
+    }
+  }
+
+  trips.sort((a, b) => a.score - b.score);
+
+  const month = {};
+  for (const t of trips) {
+    const day = t.out.legs[0].depDate;
+    if (!month[day] || t.price < month[day].price) {
+      month[day] = { price: Math.round(t.price), hub: t.out.hub ?? null, layover: t.out.layover ?? null };
+    }
+  }
+
+  const byStops = {};
+  for (const t of trips) byStops[t.tickets] = (byStops[t.tickets] ?? 0) + 1;
+
+  return {
+    ...base,
+    hubs: [...new Set([...out.hubs, ...backs.flatMap(b => b.result.hubs)])],
+    direct: [], itineraries: [],
+    trips: trips.slice(0, w.maxPairs),
+    month,
     meta: {
-      routingsSearched: routings.length,
-      hubsSearched: new Set(routings.flatMap(r => r.path.slice(1, -1))).size,
-      found: itineraries.length,
+      routingsSearched: out.routingsSearched + backs.reduce((n, b) => n + b.result.routingsSearched, 0),
+      hubsSearched: new Set([...out.hubs, ...backs.flatMap(b => b.result.hubs)]).size,
+      found: trips.length,
       byStops,
+      returnOrigins: landed,
     },
   };
 }

@@ -295,6 +295,28 @@ button.go:disabled { opacity: .55; cursor: default; }
    and takes the whole page sideways with it instead of scrolling inside. */
 .layout > * { min-width: 0; }
 
+/* ---------- trip type and swap ---------- */
+.triptype { display: flex; margin-bottom: 12px; }
+.triptype .seg-toggle { width: auto; }
+.triptype .seg-toggle button { padding: 6px 16px; }
+
+.swap {
+  position: absolute; left: 0; top: 50%; z-index: 5;
+  transform: translate(-50%, -50%);
+  width: 30px; height: 30px; padding: 0;
+  cursor: pointer; display: grid; place-items: center;
+  background: var(--surface); color: var(--muted);
+  border: 1px solid var(--line); border-radius: 50%;
+  transition: color .18s ease, border-color .18s ease;
+}
+.swap:hover { color: var(--accent); border-color: var(--accent); }
+.swap svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.swap.spin svg { animation: swapspin .4s cubic-bezier(.3,1.2,.4,1); }
+.swap:hover { transform: translate(-50%, -50%); }
+@keyframes swapspin { from { transform: rotate(0); } to { transform: rotate(180deg); } }
+
+.searchbar.round { grid-template-columns: 1fr 1fr 1fr 1fr auto; }
+
 /* ---------- search panel ----------
    The search belongs with the results it produces, not stranded in the header
    above every page of the app. */
@@ -587,6 +609,25 @@ input[type="range"] { accent-color: var(--accent); width: 100%; margin: 5px 0 0;
 }
 .legs b { color: var(--ink-2); font-weight: 600; }
 .wait-inline { color: var(--wait); }
+/* ---------- return trips ---------- */
+.card-return { align-items: start; }
+.card-return .price { padding-top: 2px; }
+.legsstack { display: grid; gap: 12px; min-width: 0; }
+.dirrow { display: grid; grid-template-columns: 42px 1fr; gap: 11px; align-items: center; min-width: 0; }
+.dir {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted);
+  border: 1px solid var(--line-soft); border-radius: 4px;
+  padding: 3px 0; text-align: center;
+}
+.dir-back { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 35%, transparent); }
+.detail-part { display: grid; gap: 8px; }
+.detail-part > .k {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted);
+}
+.detail-part .detail { border-top: 0; margin-top: 0; padding-top: 0; }
+
 .ticketpill {
   font-family: var(--mono); font-size: 10.5px; letter-spacing: .05em;
   color: var(--muted); border: 1px solid var(--line);
@@ -916,8 +957,9 @@ footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
   .tabs .sm { display: inline; }
   .infolink { order: 4; flex: 0 0 auto; }
 
-  /* Every cell filled: two fields, then the date range and the button full width. */
-  .searchbar { grid-template-columns: 1fr 1fr; }
+  /* Every cell filled: two fields, then each date range and the button full width.
+     Four columns is a desktop luxury — here it leaves 77px per place name. */
+  .searchbar, .searchbar.round { grid-template-columns: 1fr 1fr; }
   .field:first-child { border-radius: 9px 0 0 0; }
   .field.range { grid-column: span 2; }
   button.go { grid-column: span 2; padding: 13px; border-radius: 0 0 9px 9px; }
