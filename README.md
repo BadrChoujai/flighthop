@@ -67,11 +67,13 @@ interface says exactly that, next to the booking buttons — not in a footnote.
 
 ```
 app/                 the application
-  server.mjs         HTTP server, SSE search stream, static files
+  server.mjs         local dev server — wraps the handler in node:http
+  lib/handler.mjs    routes, SSE search stream, static files
   lib/ryanair.mjs    API client — cached, concurrency-gated, timezone-correct
-  lib/cache.mjs      TTL cache on node:sqlite (airports 30d, routes 3d, fares 6h)
+  lib/cache.mjs      TTL cache — SQLite on disk, memory when serverless
   lib/search.mjs     route graph, geographic pruning, stitching, scoring
   public/            interface — vanilla JS, no build step
+api/index.mjs        Vercel entry point — exports the same handler
 postman/             the public Postman collections, plus a verified API reference
 prototype/           the standalone scripts the app grew out of
 DESIGN.md            product and interface plan
@@ -109,6 +111,26 @@ distribution agreement or a licensed aggregator feed.
 
 Not affiliated with, endorsed by, or connected to Ryanair. Fares shown are one adult
 with a cabin bag; bags, seats and other extras are not included.
+
+## Deploying
+
+The same handler runs locally and on Vercel — `app/server.mjs` wraps it in a
+`node:http` server, `api/index.mjs` exports it as a function. One code path, so
+local behaviour is the deployed behaviour.
+
+The cache picks its backend from the environment: SQLite where there is a writable
+disk, memory on a serverless filesystem. A cold search against a completely empty
+cache takes about 1.5 seconds, which is why losing the disk cache is survivable
+rather than fatal.
+
+Import the repository at [vercel.com/new](https://vercel.com/new) — no build
+command, no environment variables, nothing to configure.
+
+One caveat worth testing before wiring up a domain: this talks to an airline's
+undocumented backend, and datacenter IP ranges get filtered far harder than home
+connections. Hit `/api/search` once on the deployed URL. If it returns `403`, the
+app is fine — the address it is calling from is not, and the fix is to run it
+somewhere with a residential IP.
 
 ## License
 

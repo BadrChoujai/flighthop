@@ -1,0 +1,15 @@
+{
+  "name": "flighthop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-connect flight search over the Ryanair route graph",
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "start": "node app/server.mjs",
+    "dev": "node app/server.mjs"
+  },
+  "license": "MIT"
+}
