@@ -242,14 +242,24 @@ export class DateRange {
     this.paint();
   }
 
+  /**
+   * Laid out as three cells — start, arrow, end — so the two dates sit against
+   * the outer edges of the field with the arrow centred between them, however
+   * wide the field happens to be.
+   */
   paint() {
     const label = this.root.querySelector('.range-value');
-    if (!this.from) { label.textContent = 'Pick dates'; return; }
-    const sameYear = this.to && parse(this.from).getUTCFullYear() === parse(this.to).getUTCFullYear();
-    label.innerHTML = this.to
-      ? `${fmtShort(this.from)} <span class="range-dash">→</span> ${fmtShort(this.to)}` +
-        `<span class="range-year"> ${parse(this.to).getUTCFullYear()}${sameYear ? '' : ''}</span>`
-      : `${fmtShort(this.from)} <span class="range-dash">→</span> <em>pick an end date</em>`;
+    if (!this.from) {
+      label.innerHTML = '<span class="range-empty">Pick dates</span>';
+      return;
+    }
+    const end = this.to
+      ? `${fmtShort(this.to)} <span class="range-year">${parse(this.to).getUTCFullYear()}</span>`
+      : '<em>pick an end date</em>';
+    label.innerHTML =
+      `<span class="range-a">${fmtShort(this.from)}</span>` +
+      `<span class="range-dash">→</span>` +
+      `<span class="range-b">${end}</span>`;
   }
 
   show() { this.open = true; this.pop.hidden = false; this.render(); }
