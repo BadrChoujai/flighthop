@@ -248,6 +248,23 @@ $('ticketChips').addEventListener('click', (e) => {
   else rerank();
 });
 
+/* ---------- back to top ----------
+   Appears once the header has scrolled well out of reach, which is the point at
+   which getting back becomes a chore. */
+{
+  const btn = $('toTop');
+  let ticking = false;
+  const update = () => {
+    btn.hidden = scrollY < 700;
+    ticking = false;
+  };
+  addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(update); }
+  }, { passive: true });
+  btn.onclick = () => scrollTo({ top: 0, behavior: 'smooth' });
+  update();
+}
+
 /* ---------- filter chrome ---------- */
 
 function activeFilterCount() {

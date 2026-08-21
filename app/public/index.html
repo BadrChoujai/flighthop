@@ -254,11 +254,11 @@
           <p class="rail-help">“Best” adds these to the fare, so ranking reflects your tolerance
             rather than ours.</p>
           <div class="ctrl">
-            <div class="ctrl-head"><label for="tightPenalty">A rushed transfer</label><b id="tightOut">€25/h</b></div>
+            <div class="ctrl-head"><label for="tightPenalty">A rushed transfer <button type="button" class="hint" data-tip="Added to a trip&apos;s score for every hour its layover falls short of 3 hours. Raise it to push tight connections down the list; set it to zero to rank on price alone." aria-label="Added to a trip&apos;s score for every hour its layover falls short of 3 hours. Raise it to push tight connections down the list; set it to zero to rank on price alone.">?</button></label><b id="tightOut">€25/h</b></div>
             <input type="range" id="tightPenalty" min="0" max="60" step="5" value="25" />
           </div>
           <div class="ctrl">
-            <div class="ctrl-head"><label for="longPenalty">Dead time waiting</label><b id="longOut">€8/h</b></div>
+            <div class="ctrl-head"><label for="longPenalty">Dead time waiting <button type="button" class="hint" data-tip="Added for every hour of layover beyond 8. Raise it if a long wait in a terminal is worse for you than paying more for the fare." aria-label="Added for every hour of layover beyond 8. Raise it if a long wait in a terminal is worse for you than paying more for the fare.">?</button></label><b id="longOut">€8/h</b></div>
             <input type="range" id="longPenalty" min="0" max="30" step="1" value="8" />
           </div>
         </details>
@@ -579,5 +579,9 @@
 </div>
 
 <script src="/app.js" type="module"></script>
+<button type="button" class="totop" id="toTop" aria-label="Back to top" hidden>
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6 11l6-6 6 6" /></svg>
+</button>
+
 </body>
 </html>
