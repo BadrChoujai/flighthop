@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises';
 import { join, dirname, extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { search, allAirports, resolveTargets, nearestAirport } from './search.mjs';
-import { anywhereFares, bookingUrl } from './ryanair.mjs';
+import { search, allAirports, resolveTargets, nearestAirport, zoneOf } from './search.mjs';
+import { anywhereFares, roundTripFares, bookingUrl, localToUtc, hours } from './ryanair.mjs';
 import { stats } from './cache.mjs';
 
 const publicDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -117,6 +117,101 @@ export default async function handler(req, res) {
         send('failed', { message: e.message });
       }
       return res.end();
+    }
+
+    /*
+     * "Where can I get to?" — a whole trip that fits the time you actually have.
+     *
+     * Constraints on both ends, destination unknown. One upstream request answers
+     * it: the round-trip endpoint honours a date window and a time-of-day window
+     * in each direction, so "leave after work Friday, back before Monday
+     * morning" is a query rather than a scan.
+     */
+    if (url.pathname === '/api/getaway') {
+      const origin = (q.get('from') ?? '').toUpperCase();
+      if (!origin) return json(res, 400, { message: 'Where are you starting from?' });
+
+      const data = await roundTripFares(origin, {
+        outFrom: q.get('outFrom'), outTo: q.get('outTo'),
+        backFrom: q.get('backFrom'), backTo: q.get('backTo'),
+        maxPrice: q.get('maxPrice') ? Number(q.get('maxPrice')) : undefined,
+        outAfter: q.get('outAfter') || undefined,
+        outBefore: q.get('outBefore') || undefined,
+        backAfter: q.get('backAfter') || undefined,
+        backBefore: q.get('backBefore') || undefined,
+        currency: q.get('currency') ?? 'EUR',
+      });
+
+      const wanted = q.get('country') ? await resolveTargets(q.get('country')) : null;
+      const codes = wanted ? new Set(wanted) : null;
+      const homeZone = await zoneOf(origin);
+
+      const rows = [];
+      for (const fare of data.fares ?? []) {
+        const { outbound: o, inbound: i, summary } = fare;
+        const code = o.arrivalAirport.iataCode;
+        if (codes && !codes.has(code)) continue;
+
+        // The number that matters is not the fare or the nights — it is how long
+        // you are actually there, landing to take-off, across two timezones.
+        const zone = await zoneOf(code);
+        const landed = localToUtc(o.arrivalDate, zone);
+        const leaves = localToUtc(i.departureDate, zone);
+        const onTheGround = hours(leaves - landed);
+        if (onTheGround <= 0) continue;
+
+        rows.push({
+          code, city: o.arrivalAirport.city.name, country: o.arrivalAirport.countryName,
+          price: summary.price.value, currency: summary.price.currencyCode,
+          onTheGround: +onTheGround.toFixed(1),
+          nights: Math.max(0, Math.round(onTheGround / 24)),
+          out: {
+            day: o.departureDate.slice(0, 10),
+            dep: o.departureDate.slice(11, 16), arr: o.arrivalDate.slice(11, 16),
+            flight: o.flightNumber, price: o.price.value,
+            book: bookingUrl(origin, code, o.departureDate.slice(0, 10)),
+          },
+          back: {
+            day: i.departureDate.slice(0, 10),
+            dep: i.departureDate.slice(11, 16), arr: i.arrivalDate.slice(11, 16),
+            flight: i.flightNumber, price: i.price.value,
+            book: bookingUrl(code, origin, i.departureDate.slice(0, 10)),
+          },
+        });
+      }
+
+      rows.sort((a, b) => a.price - b.price);
+
+      /*
+       * An empty result should say which constraint is doing the emptying.
+       * A budget plus "after work" is usually the pair that bites — evening
+       * departures are the expensive ones — so when nothing fits, ask again
+       * without the budget and report what the times alone would cost.
+       */
+      let cheapestThatFits = null;
+      if (!rows.length && q.get('maxPrice')) {
+        const open = await roundTripFares(origin, {
+          outFrom: q.get('outFrom'), outTo: q.get('outTo'),
+          backFrom: q.get('backFrom'), backTo: q.get('backTo'),
+          outAfter: q.get('outAfter') || undefined,
+          outBefore: q.get('outBefore') || undefined,
+          backAfter: q.get('backAfter') || undefined,
+          backBefore: q.get('backBefore') || undefined,
+          currency: q.get('currency') ?? 'EUR',
+        });
+        const best = (open.fares ?? [])
+          .filter(f => !codes || codes.has(f.outbound.arrivalAirport.iataCode))
+          .sort((a, b) => a.summary.price.value - b.summary.price.value)[0];
+        if (best) {
+          cheapestThatFits = {
+            price: best.summary.price.value,
+            currency: best.summary.price.currencyCode,
+            city: best.outbound.arrivalAirport.city.name,
+          };
+        }
+      }
+
+      return json(res, 200, { origin, homeZone, rows, cheapestThatFits });
     }
 
     // "Anywhere under €X" — one upstream call.

@@ -40,6 +40,10 @@ async function airportIndex() {
 }
 export const allAirports = async () => (await airportIndex()).list;
 
+/** IANA zone for an airport — every duration in this app depends on getting it. */
+export const zoneOf = async (code) =>
+  (await airportIndex()).byCode.get(code)?.timeZone ?? 'UTC';
+
 /**
  * Closest served airport to a point. Used to guess where the visitor is starting
  * from, so the form arrives already filled in.

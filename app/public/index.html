@@ -46,6 +46,7 @@
     <div class="tabs" role="tablist">
       <button role="tab" id="tab-search" aria-selected="false"><span class="lg">Connect me</span><span class="sm">Connect</span></button>
       <button role="tab" id="tab-explore" aria-selected="false"><span class="lg">Anywhere under</span><span class="sm">Anywhere</span></button>
+      <button role="tab" id="tab-getaway" aria-selected="false"><span class="lg">Time I have</span><span class="sm">Time</span></button>
     </div>
 
     <button class="infolink" id="tab-info" aria-pressed="false">How it works</button>
@@ -226,6 +227,7 @@
             <button data-sort="score" aria-pressed="true">Best</button>
             <button data-sort="price" aria-pressed="false">Cheapest</button>
             <button data-sort="total" aria-pressed="false">Fastest</button>
+            <button data-sort="stopover" aria-pressed="false" title="Trips with a long enough layover to leave the airport">Stopover</button>
           </div>
         </section>
 
@@ -379,6 +381,103 @@
         <div class="state" id="xidle">
           <h3>One request, every destination</h3>
           <p>The whole network out of one airport, ranked by price, with flight numbers.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============ TIME I HAVE ============ -->
+  <div id="view-getaway" class="hidden">
+    <div class="searchpanel">
+      <form class="searchbar getawaybar" id="getawayForm">
+        <div class="field picker" id="gfromPicker">
+          <label for="gfrom">From</label>
+          <input id="gfrom" placeholder="Where are you flying from?" required />
+        </div>
+        <div class="field range" id="grangePicker">
+          <label>Away between</label>
+          <button type="button" class="range-btn"><span class="range-value">Pick dates</span></button>
+        </div>
+        <div class="field">
+          <label for="gout">Leave after</label>
+          <select id="gout">
+            <option value="">any time</option>
+            <option value="12:00">midday</option>
+            <option value="15:00">15:00</option>
+            <option value="17:00" selected>17:00 — after work</option>
+            <option value="19:00">19:00</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="gback">Be back by</label>
+          <select id="gback">
+            <option value="">any time</option>
+            <option value="09:00">09:00 — before work</option>
+            <option value="12:00" selected>midday</option>
+            <option value="18:00">18:00</option>
+            <option value="23:59">end of day</option>
+          </select>
+        </div>
+        <button class="go" type="submit" id="gGo">Find</button>
+      </form>
+
+      <div class="whenchips" role="group" aria-label="Which dates">
+        <span class="stopslabel">When</span>
+        <div class="chips" id="weekendChips">
+          <button type="button" data-when="this" aria-pressed="true">This weekend</button>
+          <button type="button" data-when="next" aria-pressed="false">Next weekend</button>
+          <button type="button" data-when="any" aria-pressed="false">Any weekend</button>
+          <button type="button" data-when="custom" aria-pressed="false">My own dates</button>
+        </div>
+        <span class="stopshint" id="whenHint">Out Friday evening, back Sunday.</span>
+      </div>
+    </div>
+
+    <div class="layout">
+      <button class="filterfab" id="gFilterFab" aria-expanded="false" aria-controls="grail">Filters</button>
+      <aside class="rail" id="grail">
+        <div class="rail-top">
+          <h3 class="rail-title">Filters</h3>
+          <button type="button" class="rail-close" id="gCloseFilters" aria-label="Close filters">×</button>
+        </div>
+        <section>
+          <h4>Budget</h4>
+          <div class="ctrl">
+            <div class="ctrl-head"><label for="gmax">Return fare under</label><b id="gmaxOut">€250</b></div>
+            <input type="range" id="gmax" min="20" max="500" step="10" value="250" />
+          </div>
+        </section>
+        <section>
+          <h4>How long there</h4>
+          <div class="chips" id="stayChips" role="group" aria-label="Length of stay">
+            <button type="button" data-stay="any" aria-pressed="true">Any</button>
+            <button type="button" data-stay="short" aria-pressed="false">Under 2 days</button>
+            <button type="button" data-stay="weekend" aria-pressed="false">2–4 days</button>
+            <button type="button" data-stay="long" aria-pressed="false">Longer</button>
+          </div>
+          <p class="chips-note">Measured on the ground, landing to take-off — not in nights.</p>
+        </section>
+        <section>
+          <h4>Where</h4>
+          <div class="field picker plain" id="gcountryPicker">
+            <label for="gcountry">Country</label>
+            <input id="gcountry" placeholder="Anywhere" />
+          </div>
+        </section>
+      </aside>
+
+      <div>
+        <div class="resulthead hidden" id="ghead">
+          <h2 id="gtitle"></h2>
+          <span id="gcount"></span>
+        </div>
+        <div id="gresults"></div>
+        <nav class="pager hidden" id="gpager" aria-label="More results"></nav>
+        <div class="state" id="gidle">
+          <h3>How long have you got?</h3>
+          <p>Pick a window and Flighthop shows everywhere you could actually go and come
+            back from — with the hours you would really have there, not the nights.</p>
         </div>
       </div>
     </div>

@@ -113,6 +113,32 @@ export function anywhereFares(origin, opts = {}) {
 }
 
 /**
+ * Every round trip out of an airport inside two date windows, in one request.
+ *
+ * Deliberately no `limit`: anything over about twenty is rejected outright with
+ * InvalidLimit, and omitting it returns the full set anyway. The time-of-day
+ * filters are honoured on both directions, which is what makes a "leave after
+ * work, back before Monday" search a single call rather than one per destination.
+ */
+export function roundTripFares(origin, opts = {}) {
+  const q = new URLSearchParams({
+    departureAirportIataCode: origin,
+    outboundDepartureDateFrom: opts.outFrom,
+    outboundDepartureDateTo: opts.outTo,
+    inboundDepartureDateFrom: opts.backFrom,
+    inboundDepartureDateTo: opts.backTo,
+    market: 'en-gb',
+    currency: opts.currency ?? 'EUR',
+  });
+  if (opts.maxPrice) q.set('priceValueTo', String(opts.maxPrice));
+  if (opts.outAfter) q.set('outboundDepartureTimeFrom', opts.outAfter);
+  if (opts.outBefore) q.set('outboundDepartureTimeTo', opts.outBefore);
+  if (opts.backAfter) q.set('inboundDepartureTimeFrom', opts.backAfter);
+  if (opts.backBefore) q.set('inboundDepartureTimeTo', opts.backBefore);
+  return through(`round:${q}`, TTL.fares, () => fetchJson(`/api/farfnd/v4/roundTripFares?${q}`));
+}
+
+/**
  * The fare endpoints return local wall-clock times with no offset. Subtracting two
  * of them across airports is how you compute a layover that is wrong by hours —
  * and sell someone a connection they cannot make.

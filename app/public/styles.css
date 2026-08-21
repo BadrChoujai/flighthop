@@ -1077,3 +1077,67 @@ footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
   .cal-months .cal-month:last-child { display: none; }
   .tagdoc-row { grid-template-columns: 1fr; gap: 9px; }
 }
+
+/* ---------- time I have ---------- */
+.getawaybar { grid-template-columns: 1.1fr 1.2fr .9fr .9fr auto; }
+.field select {
+  font: inherit; font-size: 14.5px; font-weight: 600;
+  width: 100%; border: 0; background: transparent; color: var(--ink);
+  padding: 0; cursor: pointer; appearance: none;
+}
+.field select:focus { outline: none; }
+.field.plain { background: transparent; padding: 0; }
+.field.plain label { margin-bottom: 4px; }
+.field.plain input {
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 11px; background: var(--surface); font-size: 14px;
+}
+
+.whenchips {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--line-soft);
+}
+
+.card-getaway { grid-template-columns: 112px 1fr; align-items: start; }
+.getaway-body { display: grid; gap: 7px; min-width: 0; }
+.stay {
+  font-family: var(--display); font-size: 16px; font-weight: 650;
+  color: var(--accent); letter-spacing: -.01em; margin-bottom: 2px;
+}
+.hop-row {
+  display: grid; grid-template-columns: 42px 92px 1fr auto auto;
+  gap: 10px; align-items: center; min-width: 0;
+  font-family: var(--mono); font-size: 12px; color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.hop-when { color: var(--muted); }
+.hop-time { color: var(--ink); font-weight: 600; }
+.hop-flight { color: var(--muted); }
+.book-sm { margin-top: 0; padding: 5px 11px; font-size: 12px; }
+
+@media (max-width: 900px) {
+  .getawaybar { grid-template-columns: 1fr 1fr; }
+  .getawaybar .field.range { grid-column: span 2; }
+  .whenchips { flex-direction: column; align-items: flex-start; gap: 9px; }
+  .card-getaway { grid-template-columns: 1fr; }
+  .hop-row {
+    grid-template-columns: 40px 1fr auto;
+    grid-template-areas: "dir when book" "dir time book";
+    row-gap: 2px;
+  }
+  .hop-row .dir { grid-area: dir; align-self: center; }
+  .hop-when { grid-area: when; }
+  .hop-time { grid-area: time; }
+  .hop-flight { display: none; }
+  .hop-row .book-sm { grid-area: book; align-self: center; }
+}
+
+/* ---------- the layover as a destination ---------- */
+.freeday {
+  margin-top: 8px; padding: 7px 11px;
+  background: color-mix(in oklab, var(--wait) 9%, transparent);
+  border-left: 2px solid var(--wait);
+  border-radius: 0 7px 7px 0;
+  font-size: 13.5px; font-weight: 600; color: var(--ink);
+}
+.freeday span { font-weight: 400; color: var(--ink-2); }

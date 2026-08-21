@@ -8,6 +8,7 @@ const state = {
   result: null, sort: 'score', pinnedDay: null, expanded: new Set(),
   shown: 15, xrows: [], xshown: 15, lastSearchView: 'search',
   maxTickets: 2, loadedStops: null, trip: 'one',
+  grows: [], gshown: 15, stay: 'any', whenPreset: 'this',
 };
 const PAGE_SIZE = 15;
 
@@ -100,12 +101,15 @@ const countryOf = (code) => airports.find(a => a.code === code)?.country ?? '';
 
 /* ---------- pickers ---------- */
 const pickers = {
+  gfrom: new PlacePicker($('gfromPicker')),
+  gcountry: new PlacePicker($('gcountryPicker'), { places: true }),
   from: new PlacePicker($('fromPicker')),
   to: new PlacePicker($('toPicker'), { places: true }),
   xfrom: new PlacePicker($('xfromPicker')),
   xcountry: new PlacePicker($('xcountryPicker'), { places: true }),
 };
 const ranges = {
+  getaway: new DateRange($('grangePicker')),
   search: new DateRange($('rangePicker')),
   return: new DateRange($('returnPicker')),
   explore: new DateRange($('xrangePicker')),
@@ -123,7 +127,7 @@ const airportsReady = fetch('/api/airports').then(r => r.json()).then(list => {
    and the placeholder does the work. */
 airportsReady.then(() => fetch('/api/where').then(r => r.json())).then(({ known, airport }) => {
   if (!known || !airport) return;
-  for (const key of ['from', 'xfrom']) {
+  for (const key of ['from', 'xfrom', 'gfrom']) {
     if (!pickers[key].value) pickers[key].choose(airport.code, { silent: true });
   }
 }).catch(() => { /* an unfilled field is a fine outcome */ });
@@ -169,6 +173,7 @@ const VIEWS = [
   ['home', 'view-home', null],
   ['search', 'view-search', 'searchForm'],
   ['explore', 'view-explore', 'exploreForm'],
+  ['getaway', 'view-getaway', 'getawayForm'],
   ['info', 'view-info', null],
 ];
 
@@ -183,6 +188,7 @@ function showTab(which) {
 
   $('tab-search').setAttribute('aria-selected', String(which === 'search'));
   $('tab-explore').setAttribute('aria-selected', String(which === 'explore'));
+  $('tab-getaway').setAttribute('aria-selected', String(which === 'getaway'));
   $('tab-info').setAttribute('aria-pressed', String(which === 'info'));
   $('tab-info').textContent = which === 'info' ? 'Back to search' : 'How it works';
   document.body.classList.toggle('reading', which === 'info');
@@ -202,6 +208,7 @@ function showTab(which) {
 
 $('tab-search').onclick = () => showTab('search');
 $('tab-explore').onclick = () => showTab('explore');
+$('tab-getaway').onclick = () => showTab('getaway');
 
 // A toggle: pressing it again returns you to whichever view you came from.
 $('tab-info').onclick = () => showTab(
@@ -537,6 +544,14 @@ function visible() {
       return { ...it, score: it.price + penalty };
     });
 
+  if (state.sort === 'stopover') {
+    // Trips that offer a day somewhere first, longest day first, then cheapest.
+    return scored
+      .map(it => ({ ...it, stopover: bestStopover(it) }))
+      .sort((a, b) =>
+        (b.stopover?.hours ?? -1) - (a.stopover?.hours ?? -1) || a.price - b.price);
+  }
+
   const key = state.sort;
   scored.sort((a, b) => (a[key] ?? a.price) - (b[key] ?? b.price));
   return scored;
@@ -549,6 +564,59 @@ function rerank() {
   state.shown = PAGE_SIZE;
   paintFilterCount();
   render();
+}
+
+/* ==================== the layover as a destination ====================
+   Every other site treats a long connection as damage. If it is long enough,
+   in daylight, and the airport is close enough to somewhere, it is a free day
+   in another city — which is a reason to pick the trip, not to avoid it. */
+
+/* Airports far enough from the city they are named for that a short stop is not
+   worth the journey. Hours, round trip, door to door. */
+const CITY_TRANSFER = {
+  BVA: 3.0, CRL: 2.0, STN: 2.0, LTN: 2.0, NRN: 2.5, HHN: 2.5,
+  TSF: 1.5, BGY: 1.5, MXP: 1.5, GRO: 2.0, RYG: 2.0, TRF: 2.0,
+};
+const DEFAULT_TRANSFER = 1.2;
+
+const toMinutes = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+/**
+ * Hours you could actually spend in the city on a given layover, or null if it
+ * is not worth leaving the airport for.
+ */
+function stopoverAt(it, i) {
+  if (it.kind !== 'connection') return null;
+  const wait = it.layovers?.[i];
+  const arrival = it.legs[i], onward = it.legs[i + 1];
+  if (wait === undefined || !onward) return null;
+
+  // An overnight stop is a hotel, not an afternoon out.
+  if (onward.depDate !== arrival.arrDate) return null;
+
+  const hub = arrival.to;
+  const overhead = (CITY_TRANSFER[hub] ?? DEFAULT_TRANSFER) + 2.5;  // transfer + bags + check-in again
+  const usable = wait - overhead;
+  if (usable < 3) return null;
+
+  // And it has to be in daylight — three hours in a city at 04:00 is not a visit.
+  const out = toMinutes(arrival.arrLocal) + (CITY_TRANSFER[hub] ?? DEFAULT_TRANSFER) * 30 + 60;
+  const back = toMinutes(onward.depLocal) - 120 - (CITY_TRANSFER[hub] ?? DEFAULT_TRANSFER) * 30;
+  const daylight = (Math.min(back, 21 * 60) - Math.max(out, 8 * 60)) / 60;
+  if (daylight < 3) return null;
+
+  return { hub, city: cityOf(hub), hours: +Math.min(usable, daylight).toFixed(1) };
+}
+
+/** The best stopover a trip offers, if any. */
+function bestStopover(it) {
+  if (it.kind === 'return') {
+    return [...(it.out.layovers ?? []).map((_, i) => stopoverAt(it.out, i)),
+            ...(it.back.layovers ?? []).map((_, i) => stopoverAt(it.back, i))]
+      .filter(Boolean).sort((a, b) => b.hours - a.hours)[0] ?? null;
+  }
+  return (it.layovers ?? []).map((_, i) => stopoverAt(it, i))
+    .filter(Boolean).sort((a, b) => b.hours - a.hours)[0] ?? null;
 }
 
 /* ---------- rendering ---------- */
@@ -705,6 +773,12 @@ function card(it, i, maxSpan) {
   const via = it.kind === 'direct' ? ''
     : ` · via <span class="via">${it.hubs.map(cityOf).join(', ')}</span>`;
 
+  const stop = bestStopover(it);
+  const stopLine = stop
+    ? `<div class="freeday">${stop.hours >= 6 ? 'A free day' : 'Time enough'} in ${stop.city}
+        <span>— about ${Math.round(stop.hours)} hours in the city, between flights</span></div>`
+    : '';
+
   return `<div class="card ${open ? 'open' : ''}" data-id="${id}" data-i="${i}">
     <div class="price">${money(it.price, it.currency)}
       <span class="dest">${destination}</span>
@@ -716,6 +790,7 @@ function card(it, i, maxSpan) {
         <span>${legLine}</span>
         <span>${tickets} ${chip} &nbsp; ${hrs(it.total)} door to door</span>
       </div>
+      ${stopLine}
     </div>
     ${open ? detail(it) : ''}
   </div>`;
@@ -897,3 +972,175 @@ $('exploreForm').addEventListener('submit', async (e) => {
     $('xidle').innerHTML = `<h3 style="color:var(--risk)">That search did not work</h3><p>${err.message}</p>`;
   }
 });
+
+/* ==================== time I have ====================
+   The question the big sites are not organised to ask: constraints on both ends,
+   destination unknown. One upstream request answers it. */
+
+/** Friday of the coming weekend, or the one after. */
+function weekendDates(which) {
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const toFriday = (5 - ((today.getUTCDay() + 6) % 7 + 1) + 7) % 7;   // ISO: Mon=1 … Fri=5
+  const friday = new Date(today);
+  friday.setUTCDate(friday.getUTCDate() + toFriday + (which === 'next' ? 7 : 0));
+  const sunday = new Date(friday);
+  sunday.setUTCDate(sunday.getUTCDate() + 2);
+  return { from: iso(friday), to: iso(sunday) };
+}
+
+const WHEN_HINT = {
+  this: 'Out Friday evening, back Sunday.',
+  next: 'The weekend after this one.',
+  any: 'Any weekend in the next two months — cheapest wins.',
+  custom: 'Your dates. The trip can be as long as the window allows.',
+};
+
+function applyWhenPreset(which) {
+  state.whenPreset = which;
+  press($('weekendChips'), $('weekendChips').querySelector(`[data-when="${which}"]`));
+  $('whenHint').textContent = WHEN_HINT[which];
+  if (which === 'this' || which === 'next') {
+    const { from, to } = weekendDates(which);
+    ranges.getaway.set(from, to);
+  } else if (which === 'any') {
+    const start = new Date();
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 60);
+    ranges.getaway.set(iso(start), iso(end));
+  }
+}
+
+$('weekendChips').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-when]');
+  if (btn) applyWhenPreset(btn.dataset.when);
+});
+// Touching the calendar directly means the preset no longer describes the dates.
+$('grangePicker').addEventListener('rangechange', () => applyWhenPreset('custom'));
+
+$('stayChips').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-stay]');
+  if (!btn) return;
+  state.stay = btn.dataset.stay;
+  press($('stayChips'), btn);
+  state.gshown = PAGE_SIZE;
+  renderGetaway();
+});
+
+bind('gmax', 'gmaxOut', v => `€${v}`);
+$('gFilterFab').onclick = () => document.body.classList.add('filters-open');
+$('gCloseFilters').onclick = () => document.body.classList.remove('filters-open');
+
+const STAY = {
+  any: () => true,
+  short: (h) => h < 48,
+  weekend: (h) => h >= 48 && h <= 96,
+  long: (h) => h > 96,
+};
+
+/** Hours on the ground, said the way a person would say it. */
+const stayLabel = (h) => {
+  if (h < 24) return `${Math.round(h)} hours there`;
+  const days = Math.floor(h / 24);
+  const rest = Math.round(h - days * 24);
+  return rest >= 1 ? `${days}d ${rest}h there` : `${days} days there`;
+};
+
+$('getawayForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const origin = pickers.gfrom.commit();
+  if (!origin) return;
+
+  $('gidle').classList.remove('hidden');
+  $('gidle').innerHTML = '<h3>Looking for somewhere to go</h3><p>One question, one request.</p>';
+  $('gresults').innerHTML = '';
+  $('ghead').classList.add('hidden');
+
+  const q = new URLSearchParams({
+    from: origin,
+    outFrom: ranges.getaway.from, outTo: ranges.getaway.to,
+    // The return window has to reach past the outbound one, or there is nothing
+    // to come back on.
+    backFrom: ranges.getaway.from, backTo: ranges.getaway.to,
+    maxPrice: $('gmax').value,
+  });
+  if ($('gout').value) { q.set('outAfter', $('gout').value); q.set('outBefore', '23:59'); }
+  if ($('gback').value) { q.set('backAfter', '00:00'); q.set('backBefore', $('gback').value); }
+  if (pickers.gcountry.commit()) q.set('country', pickers.gcountry.value);
+
+  try {
+    const res = await fetch('/api/getaway?' + q);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message);
+    state.grows = data.rows;
+    state.cheapestThatFits = data.cheapestThatFits;
+    state.gshown = PAGE_SIZE;
+    $('gidle').classList.add('hidden');
+    $('ghead').classList.remove('hidden');
+    const where = pickers.gcountry.value || 'anywhere';
+    $('gtitle').textContent = `${cityOf(data.origin)} → ${where}`;
+    renderGetaway();
+  } catch (err) {
+    $('gidle').classList.remove('hidden');
+    $('gidle').innerHTML = `<h3 style="color:var(--risk)">That search did not work</h3><p>${err.message}</p>`;
+  }
+});
+
+function renderGetaway() {
+  const rows = state.grows.filter(r => STAY[state.stay](r.onTheGround));
+  if (!rows.length) {
+    $('gcount').textContent = state.grows.length
+      ? `none of ${state.grows.length} are that long`
+      : 'nothing fits';
+
+    // Name the constraint that is doing the emptying rather than listing all of
+    // them: the server checked what the times alone would cost.
+    const hint = state.grows.length
+      ? 'Every trip found is a different length. Try another stay filter.'
+      : state.cheapestThatFits
+        ? `Nothing under ${money(Number($('gmax').value), 'EUR')} leaves and returns when you need it to.
+           The cheapest that does is ${money(state.cheapestThatFits.price, state.cheapestThatFits.currency)}
+           to ${state.cheapestThatFits.city} — evening departures are the expensive ones.`
+        : 'Nothing flies in that window. Try a wider one, or a later flight home.';
+
+    $('gresults').innerHTML = `<div class="state"><h3>Nothing fits that window</h3><p>${hint}</p></div>`;
+    renderLoadMore($('gpager'), 0, 0, () => {});
+    return;
+  }
+
+  state.gshown = Math.min(Math.max(PAGE_SIZE, state.gshown), rows.length);
+  const page = rows.slice(0, state.gshown);
+  $('gcount').textContent = `${page.length} of ${rows.length} places you could go`;
+
+  $('gresults').innerHTML = page.map(r => `
+    <div class="card card-getaway">
+      <div class="price">${money(r.price, r.currency)}
+        <span class="dest">${r.city} <span class="code">${r.code}</span></span>
+        <small>${r.country}</small>
+      </div>
+      <div class="getaway-body">
+        <div class="stay">${stayLabel(r.onTheGround)}</div>
+        <div class="hop-row">
+          <span class="dir">Out</span>
+          <span class="hop-when">${dayName(r.out.day)}</span>
+          <span class="hop-time">${r.out.dep} → ${r.out.arr}</span>
+          <span class="hop-flight">${r.out.flight}</span>
+          <a class="book book-sm" href="${r.out.book}" target="_blank" rel="noopener">Book</a>
+        </div>
+        <div class="hop-row">
+          <span class="dir dir-back">Back</span>
+          <span class="hop-when">${dayName(r.back.day)}</span>
+          <span class="hop-time">${r.back.dep} → ${r.back.arr}</span>
+          <span class="hop-flight">${r.back.flight}</span>
+          <a class="book book-sm" href="${r.back.book}" target="_blank" rel="noopener">Book</a>
+        </div>
+      </div>
+    </div>`).join('');
+
+  renderLoadMore($('gpager'), rows.length, state.gshown, (n) => {
+    state.gshown = n;
+    renderGetaway();
+  });
+}
+
+applyWhenPreset('this');
