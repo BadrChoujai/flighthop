@@ -509,7 +509,13 @@ body.reading .headrow { justify-content: space-between; }
 
 .hidden { display: none !important; }
 
-footer { margin-top: 40px; font-size: 12.5px; color: var(--muted); }
+footer {
+  margin-top: 48px; padding-top: 20px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 13px; color: var(--muted); text-align: center;
+}
+footer a { color: var(--ink-2); font-weight: 600; text-decoration: none; border-bottom: 1px solid var(--line); }
+footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
