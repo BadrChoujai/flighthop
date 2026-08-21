@@ -1084,7 +1084,9 @@ footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
   font: inherit; font-size: 14.5px; font-weight: 600;
   width: 100%; border: 0; background: transparent; color: var(--ink);
   padding: 0; cursor: pointer; appearance: none;
+  line-height: inherit; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;
 }
+.field select option { font-weight: 400; color: var(--ink); background: var(--surface); }
 .field select:focus { outline: none; }
 .field.plain { background: transparent; padding: 0; }
 .field.plain label { margin-bottom: 4px; }
@@ -1141,3 +1143,9 @@ footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
   font-size: 13.5px; font-weight: 600; color: var(--ink);
 }
 .freeday span { font-weight: 400; color: var(--ink-2); }
+
+@media (max-width: 900px) {
+  /* Declared here, after the base rule above — otherwise source order wins at
+     equal specificity and these two fields keep zooming the page on tap. */
+  .field select { font-size: 16px; }
+}
