@@ -118,6 +118,7 @@ function showTab(which) {
   $('tab-search').setAttribute('aria-selected', String(which === 'search'));
   $('tab-explore').setAttribute('aria-selected', String(which === 'explore'));
   $('tab-info').setAttribute('aria-pressed', String(which === 'info'));
+  document.body.classList.toggle('reading', which === 'info');
   if (which === 'info') scrollTo({ top: 0, behavior: 'smooth' });
 }
 $('tab-search').onclick = () => showTab('search');
