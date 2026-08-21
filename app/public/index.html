@@ -11,16 +11,16 @@
 
 <header>
   <div class="wrap headrow">
-    <h1 class="brand">Flight<span class="hop">hop</span></h1>
+    <h1 class="brand"><button type="button" id="home" title="Back to search">Flight<span class="hop">hop</span></button></h1>
 
     <form class="searchbar" id="searchForm">
       <div class="field picker" id="fromPicker">
         <label for="from">From</label>
-        <input id="from" placeholder="City or airport" data-value="VIE" required />
+        <input id="from" placeholder="Where are you flying from?" required />
       </div>
       <div class="field picker" id="toPicker">
         <label for="to">To</label>
-        <input id="to" placeholder="Anywhere, or a country" data-value="TNG" required />
+        <input id="to" placeholder="Anywhere, or a country" required />
       </div>
       <div class="field range" id="rangePicker">
         <label>When</label>
@@ -32,7 +32,7 @@
     <form class="searchbar hidden" id="exploreForm">
       <div class="field picker" id="xfromPicker">
         <label for="xfrom">From</label>
-        <input id="xfrom" placeholder="City or airport" data-value="VIE" required />
+        <input id="xfrom" placeholder="Where are you flying from?" required />
       </div>
       <div class="field picker" id="xcountryPicker">
         <label for="xcountry">To</label>
@@ -103,13 +103,24 @@
 
       <div>
         <div id="monthPanel" class="month-panel hidden">
-          <h3 id="monthTitle">Best price per departure day</h3>
+          <div class="month-head">
+            <h3 id="monthTitle">Best price per departure day</h3>
+            <button type="button" class="month-reset hidden" id="monthReset">Show all days</button>
+          </div>
           <div class="month" id="monthGrid"></div>
         </div>
 
         <div class="notice" id="notice" hidden>
-          <span>⚠</span>
-          <div><b>These are two separate tickets.</b> If the first flight is late, nobody owes you the second one or a refund for it. Leave more time than you would on a through ticket, and expect to collect and re-check bags at the connection.</div>
+          <span class="notice-mark" aria-hidden="true">!</span>
+          <div class="notice-body">
+            <b>Two tickets, not one</b>
+            <p>Miss the second flight and nobody owes you a seat, a refund, or a hotel. You will
+              also collect and re-check your bags at the connection.</p>
+          </div>
+          <div class="notice-actions">
+            <button type="button" class="notice-more" id="noticeMore">What to check</button>
+            <button type="button" class="notice-close" id="noticeClose" aria-label="Dismiss this warning">×</button>
+          </div>
         </div>
 
         <div class="resulthead hidden" id="resultHead">
@@ -118,6 +129,7 @@
         </div>
 
         <div id="results"></div>
+        <nav class="pager hidden" id="pager" aria-label="Result pages"></nav>
 
         <div class="state" id="idle">
           <h3>Where do you want to go?</h3>
@@ -165,6 +177,7 @@
           <span id="xcount"></span>
         </div>
         <div class="scroll" id="xresults"></div>
+        <nav class="pager hidden" id="xpager" aria-label="Result pages"></nav>
         <div class="state" id="xidle">
           <h3>One request, every destination</h3>
           <p>The whole network out of one airport, ranked by price, with flight numbers.</p>

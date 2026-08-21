@@ -98,12 +98,15 @@ header {
 }
 header .wrap { padding-bottom: 0; }
 .headrow { display: flex; align-items: center; gap: 18px; }
-.brand {
+.brand { margin: 0; white-space: nowrap; }
+.brand button {
   font-family: var(--display);
-  font-size: 22px; font-weight: 700; letter-spacing: -.03em; margin: 0;
-  white-space: nowrap;
+  font-size: 22px; font-weight: 700; letter-spacing: -.03em;
+  background: transparent; border: 0; padding: 0; cursor: pointer;
+  color: var(--ink); line-height: 1.2;
 }
-.brand .hop { color: var(--accent); }
+.brand button:hover .hop { color: var(--ink); }
+.brand .hop { color: var(--accent); transition: color .14s ease; }
 .tabs { display: flex; gap: 2px; background: var(--surface-2); border-radius: 8px; padding: 3px; flex-shrink: 0; }
 .tabs button {
   font: inherit; font-size: 13.5px; font-weight: 600;
@@ -259,13 +262,74 @@ input[type="range"] { accent-color: var(--accent); width: 100%; margin: 5px 0 0;
 .check input { accent-color: var(--accent); width: 15px; height: 15px; }
 
 /* ---------- results ---------- */
+/* The warning has to land once without becoming furniture the eye skips. Compact,
+   with the point in a heading, an action, and a way to put it away for good. */
 .notice {
-  display: flex; gap: 11px; align-items: flex-start;
-  background: var(--wait-soft); color: var(--ink);
-  border: 1px solid color-mix(in oklab, var(--wait) 30%, transparent);
-  border-radius: 9px; padding: 12px 14px; font-size: 13.5px; margin-bottom: 18px;
+  display: flex; gap: 13px; align-items: center;
+  background: var(--surface);
+  border: 1px solid color-mix(in oklab, var(--wait) 38%, var(--line));
+  border-left: 3px solid var(--wait);
+  border-radius: 9px; padding: 12px 14px; margin-bottom: 16px;
 }
-.notice b { color: var(--wait); }
+.notice-mark {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--wait); color: var(--surface);
+  font-family: var(--mono); font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+:root[data-theme="dark"] .notice-mark { color: #1b1405; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .notice-mark { color: #1b1405; } }
+.notice-body { flex: 1; min-width: 0; }
+.notice-body b { display: block; font-size: 14.5px; color: var(--ink); margin-bottom: 1px; }
+.notice-body p { margin: 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+.notice-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.notice-more {
+  font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; white-space: nowrap;
+  background: transparent; color: var(--wait);
+  border: 1px solid color-mix(in oklab, var(--wait) 45%, transparent);
+  border-radius: 6px; padding: 6px 11px;
+}
+.notice-more:hover { background: var(--wait-soft); }
+.notice-close {
+  font: inherit; font-size: 19px; line-height: 1; cursor: pointer;
+  background: transparent; border: 0; color: var(--muted);
+  width: 28px; height: 28px; border-radius: 6px;
+}
+.notice-close:hover { background: var(--surface-2); color: var(--ink); }
+
+/* ---------- pagination ---------- */
+.pager {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin: 18px 0 4px; flex-wrap: wrap;
+}
+.pager button {
+  font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  background: var(--surface); color: var(--ink-2);
+  border: 1px solid var(--line); border-radius: 7px; padding: 7px 12px;
+}
+.pager button:hover:not(:disabled):not(.current) { border-color: var(--accent); color: var(--accent); }
+.pager button:disabled { opacity: .4; cursor: default; }
+.pg-nums { display: flex; gap: 4px; align-items: center; }
+.pg-num {
+  min-width: 36px; font-variant-numeric: tabular-nums; text-align: center;
+  font-family: var(--mono); font-size: 12.5px !important; padding: 7px 8px !important;
+}
+.pg-num.current {
+  background: var(--accent); border-color: var(--accent);
+  color: var(--accent-ink); cursor: default;
+}
+.pg-gap { color: var(--muted); padding: 0 2px; font-size: 13px; }
+
+/* ---------- month panel head ---------- */
+.month-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.month-head h3 { margin: 0; }
+.month-reset {
+  font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; white-space: nowrap;
+  background: var(--accent-soft); color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent);
+  border-radius: 6px; padding: 5px 11px;
+}
+.month-reset:hover { background: var(--accent); color: var(--accent-ink); }
 
 .resulthead { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
 .resulthead h2 { font-family: var(--display); font-size: 20px; font-weight: 650; letter-spacing: -.02em; margin: 0; }

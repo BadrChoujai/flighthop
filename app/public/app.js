@@ -4,7 +4,11 @@
 import { PlacePicker, DateRange } from '/components.js';
 
 const $ = (id) => document.getElementById(id);
-const state = { result: null, sort: 'score', pinnedDay: null, expanded: new Set() };
+const state = {
+  result: null, sort: 'score', pinnedDay: null, expanded: new Set(),
+  page: 1, xrows: [], xpage: 1, lastSearchView: 'search',
+};
+const PER_PAGE = 15;
 
 /* ---------- helpers ---------- */
 const hrs = (h) => h >= 1
@@ -89,17 +93,27 @@ const ranges = {
 };
 
 let airports = [];
-fetch('/api/airports').then(r => r.json()).then(list => {
+const airportsReady = fetch('/api/airports').then(r => r.json()).then(list => {
   airports = list;
   Object.values(pickers).forEach(p => p.load(list));
 });
 
-/* ---------- default dates: a month, starting two weeks out ---------- */
+/* ---------- default origin: wherever the visitor is ----------
+   The server reads this from the request rather than asking the browser for
+   location permission on page load. If it cannot tell, the field stays empty
+   and the placeholder does the work. */
+airportsReady.then(() => fetch('/api/where').then(r => r.json())).then(({ known, airport }) => {
+  if (!known || !airport) return;
+  for (const key of ['from', 'xfrom']) {
+    if (!pickers[key].value) pickers[key].choose(airport.code, { silent: true });
+  }
+}).catch(() => { /* an unfilled field is a fine outcome */ });
+
+/* ---------- default dates: from today, a month wide ---------- */
 {
   const start = new Date();
-  start.setUTCDate(start.getUTCDate() + 14);
   const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 29);
+  end.setUTCDate(end.getUTCDate() + 30);
   ranges.search.set(iso(start), iso(end));
   ranges.explore.set(iso(start), iso(end));
 }
@@ -115,15 +129,26 @@ function showTab(which) {
     $(view).classList.toggle('hidden', !on);
     if (form) $(form).classList.toggle('hidden', !on);
   }
+  if (which !== 'info') state.lastSearchView = which;
   $('tab-search').setAttribute('aria-selected', String(which === 'search'));
   $('tab-explore').setAttribute('aria-selected', String(which === 'explore'));
   $('tab-info').setAttribute('aria-pressed', String(which === 'info'));
+  $('tab-info').textContent = which === 'info' ? 'Back to search' : 'How it works';
   document.body.classList.toggle('reading', which === 'info');
   if (which === 'info') scrollTo({ top: 0, behavior: 'smooth' });
 }
 $('tab-search').onclick = () => showTab('search');
 $('tab-explore').onclick = () => showTab('explore');
-$('tab-info').onclick = () => showTab($('tab-info').getAttribute('aria-pressed') === 'true' ? 'search' : 'info');
+
+// A toggle: pressing it again returns you to whichever search you were on, not
+// always to the first one.
+$('tab-info').onclick = () => showTab(
+  $('tab-info').getAttribute('aria-pressed') === 'true' ? state.lastSearchView : 'info');
+
+$('home').onclick = () => {
+  showTab('search');
+  scrollTo({ top: 0, behavior: 'smooth' });
+};
 
 /* A tag in the results is the natural place to wonder what it means, so make it
    the link to the explanation. */
@@ -142,12 +167,12 @@ const bind = (id, out, fmt, onChange) => {
   el.addEventListener('input', update);
   update();
 };
-bind('minLayover', 'minLayoutOut', v => `${Number(v).toFixed(1)} h`, () => render());
-bind('maxLayover', 'maxLayoutOut', v => `${v} h`, () => render());
-bind('tightPenalty', 'tightOut', v => `€${v}/h`, () => render());
-bind('longPenalty', 'longOut', v => `€${v}/h`, () => render());
-bind('maxPrice', 'maxPriceOut', v => (Number(v) === 0 ? 'any' : `€${v}`), () => render());
-$('noOvernight').addEventListener('change', () => render());
+bind('minLayover', 'minLayoutOut', v => `${Number(v).toFixed(1)} h`, () => rerank());
+bind('maxLayover', 'maxLayoutOut', v => `${v} h`, () => rerank());
+bind('tightPenalty', 'tightOut', v => `€${v}/h`, () => rerank());
+bind('longPenalty', 'longOut', v => `€${v}/h`, () => rerank());
+bind('maxPrice', 'maxPriceOut', v => (Number(v) === 0 ? 'any' : `€${v}`), () => rerank());
+$('noOvernight').addEventListener('change', () => rerank());
 
 $('sortToggle').addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-sort]');
@@ -155,12 +180,69 @@ $('sortToggle').addEventListener('click', (e) => {
   state.sort = btn.dataset.sort;
   [...$('sortToggle').children].forEach(b =>
     b.setAttribute('aria-pressed', String(b === btn)));
-  render();
+  rerank();
 });
 
 bind('xmax', 'xmaxOut', v => `€${v}`);
 bind('xafter', 'xafterOut', v => (Number(v) === 0 ? 'any' : `${String(v).padStart(2, '0')}:00`));
 bind('xbefore', 'xbeforeOut', v => (Number(v) === 24 ? 'any' : `${String(v).padStart(2, '0')}:00`));
+
+/* ---------- the two-tickets warning ----------
+   It has to be read once, not every session forever. Dismissing it sticks, and
+   the same point is always one click away on the How it works page. */
+const NOTICE_KEY = 'flighthop:notice-dismissed';
+const noticeDismissed = () => {
+  try { return localStorage.getItem(NOTICE_KEY) === '1'; } catch { return false; }
+};
+$('noticeClose').onclick = () => {
+  $('notice').hidden = true;
+  try { localStorage.setItem(NOTICE_KEY, '1'); } catch { /* private mode: shown again next time */ }
+};
+$('noticeMore').onclick = () => {
+  showTab('info');
+  requestAnimationFrame(() => $('tags').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+};
+
+/* Clicking a day filters the list to it. Clicking the same day again clears it,
+   but that is not something anyone discovers — so say so with a button. */
+$('monthReset').onclick = () => {
+  state.pinnedDay = null;
+  renderMonth();
+  rerank();
+};
+
+/* ---------- pagination ----------
+   Shared by both listings. Renders nothing at all for a single page. */
+function renderPager(el, total, current, onGo) {
+  const pages = Math.ceil(total / PER_PAGE);
+  if (pages <= 1) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  el.classList.remove('hidden');
+
+  // First, last, and a window around the current page — with gaps marked.
+  const window_ = new Set([1, pages, current, current - 1, current + 1]);
+  if (current <= 3) [2, 3, 4].forEach(n => window_.add(n));
+  if (current >= pages - 2) [pages - 1, pages - 2, pages - 3].forEach(n => window_.add(n));
+  const shown = [...window_].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
+
+  let html = `<button class="pg-step" data-go="${current - 1}" ${current === 1 ? 'disabled' : ''}
+                aria-label="Previous page">‹ Previous</button><span class="pg-nums">`;
+  let prev = 0;
+  for (const n of shown) {
+    if (n - prev > 1) html += '<span class="pg-gap">…</span>';
+    html += `<button class="pg-num${n === current ? ' current' : ''}" data-go="${n}"
+               ${n === current ? 'aria-current="page"' : ''}>${n}</button>`;
+    prev = n;
+  }
+  html += `</span><button class="pg-step" data-go="${current + 1}" ${current === pages ? 'disabled' : ''}
+             aria-label="Next page">Next ›</button>`;
+  el.innerHTML = html;
+
+  el.onclick = (e) => {
+    const btn = e.target.closest('[data-go]');
+    if (!btn || btn.disabled) return;
+    onGo(Number(btn.dataset.go));
+  };
+}
 
 /* ---------- search ---------- */
 $('searchForm').addEventListener('submit', (e) => {
@@ -175,7 +257,8 @@ function setPhase(phase) {
   const showResults = phase === 'done';
   $('resultHead').classList.toggle('hidden', !showResults);
   $('monthPanel').classList.toggle('hidden', !showResults);
-  $('notice').hidden = !showResults;
+  $('notice').hidden = !showResults || noticeDismissed();
+  if (!showResults) { $('pager').classList.add('hidden'); $('pager').innerHTML = ''; }
   if (phase !== 'done') $('results').innerHTML = '';
 }
 
@@ -184,6 +267,7 @@ function runSearch() {
   stream?.close();
   state.pinnedDay = null;
   state.expanded.clear();
+  state.page = 1;
   setPhase('loading');
   $('goBtn').disabled = true;
   $('progressBar').style.width = '0%';
@@ -191,7 +275,7 @@ function runSearch() {
   $('loadingSub').textContent = 'Building the route graph…';
 
   const q = new URLSearchParams({
-    from: pickers.from.value, to: pickers.to.value,
+    from: pickers.from.commit(), to: pickers.to.commit(),
     dateFrom: ranges.search.from, dateTo: ranges.search.to,
     minLayover: $('minLayover').value, maxLayover: $('maxLayover').value,
   });
@@ -278,6 +362,14 @@ function visible() {
   return scored;
 }
 
+/* Any change to filters or sorting invalidates which page you were on. Declared
+   as a function so the rail bindings can call it while the module is still
+   evaluating. */
+function rerank() {
+  state.page = 1;
+  render();
+}
+
 /* ---------- rendering ---------- */
 function render() {
   if (!state.result) return;
@@ -296,21 +388,38 @@ function render() {
       : `${r.targets.length} airports`;
   })();
   $('resultTitle').textContent = `${airports.find(a => a.code === r.origin)?.city ?? r.origin} → ${dest}`;
-  $('resultCount').textContent =
-    `${rows.length} of ${r.direct.length + r.itineraries.length} shown · ${r.meta.hubsSearched} hubs searched` +
-    (state.pinnedDay ? ` · ${dayName(state.pinnedDay)} only` : '');
 
   if (!rows.length) {
+    $('resultCount').textContent =
+      `none of ${r.direct.length + r.itineraries.length} match · ${r.meta.hubsSearched} hubs searched`;
     $('results').innerHTML = `<div class="state">
       <h3>Nothing matches those limits</h3>
       <p>The cheapest trip that does exist is ${money(Math.min(...[...r.direct, ...r.itineraries].map(i => i.price)) || 0, r.currency)}.
          Try a longer maximum layover, or raise the budget.</p></div>`;
+    renderPager($('pager'), 0, 1, () => {});
     return;
   }
 
+  const pages = Math.ceil(rows.length / PER_PAGE);
+  state.page = Math.min(Math.max(1, state.page), pages);
+  const start = (state.page - 1) * PER_PAGE;
+  const page = rows.slice(start, start + PER_PAGE);
+
+  $('resultCount').textContent =
+    `${start + 1}–${start + page.length} of ${rows.length} · ${r.meta.hubsSearched} hubs searched` +
+    (state.pinnedDay ? ` · ${dayName(state.pinnedDay)} only` : '');
+
+  // Bar widths stay comparable across pages by scaling to the whole result set,
+  // not to whichever trips happen to be on screen.
   const maxSpan = Math.max(...rows.map(i => i.total));
-  $('results').innerHTML = rows.slice(0, 60).map((it, i) => card(it, i, maxSpan)).join('');
+  $('results').innerHTML = page.map((it, i) => card(it, i, maxSpan)).join('');
   fitBarLabels();
+
+  renderPager($('pager'), rows.length, state.page, (n) => {
+    state.page = n;
+    render();
+    $('resultHead').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
 
 function card(it, i, maxSpan) {
@@ -411,7 +520,10 @@ function renderMonth() {
 
   const prices = days.map(d => month[d].price);
   const lo = Math.min(...prices), hi = Math.max(...prices);
-  $('monthTitle').textContent = `Best price per departure day · ${money(lo, state.result.currency)} to ${money(hi, state.result.currency)}`;
+  $('monthTitle').textContent = state.pinnedDay
+    ? `Showing ${dayName(state.pinnedDay)} only`
+    : `Best price per departure day · ${money(lo, state.result.currency)} to ${money(hi, state.result.currency)}`;
+  $('monthReset').classList.toggle('hidden', !state.pinnedDay);
 
   ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(d => {
     const el = document.createElement('div');
@@ -446,7 +558,7 @@ function renderMonth() {
       cell.onclick = () => {
         state.pinnedDay = state.pinnedDay === key ? null : key;
         renderMonth();
-        render();
+        rerank();
       };
     } else {
       cell.disabled = true;
@@ -458,15 +570,49 @@ function renderMonth() {
 }
 
 /* ---------- explore ---------- */
+function renderExplore() {
+  const rows = state.xrows;
+  if (!rows.length) {
+    $('xresults').innerHTML = '';
+    $('xcount').textContent = '';
+    renderPager($('xpager'), 0, 1, () => {});
+    return;
+  }
+
+  const pages = Math.ceil(rows.length / PER_PAGE);
+  state.xpage = Math.min(Math.max(1, state.xpage), pages);
+  const start = (state.xpage - 1) * PER_PAGE;
+  const page = rows.slice(start, start + PER_PAGE);
+
+  $('xcount').textContent = `${start + 1}–${start + page.length} of ${rows.length} destinations`;
+  $('xresults').innerHTML = `<table>
+    <thead><tr><th>Fare</th><th>Where</th><th>Country</th><th>Departs</th><th>Flight</th><th></th></tr></thead>
+    <tbody>${page.map(r => `<tr>
+      <td class="num">${money(r.price, r.currency)}</td>
+      <td><strong>${r.city}</strong> <span style="color:var(--muted)">${r.code}</span>${r.newRoute ? ' <span class="chip chip-direct">new</span>' : ''}</td>
+      <td style="color:var(--ink-2)">${r.country}</td>
+      <td class="dim">${dayName(r.day)} ${r.depLocal}→${r.arrLocal}</td>
+      <td class="dim">${r.flight}</td>
+      <td><a class="book" href="${r.book}" target="_blank" rel="noopener">Book</a></td>
+    </tr>`).join('')}</tbody></table>`;
+
+  renderPager($('xpager'), rows.length, state.xpage, (n) => {
+    state.xpage = n;
+    renderExplore();
+    $('xhead').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+
 $('exploreForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const after = Number($('xafter').value), before = Number($('xbefore').value);
   const q = new URLSearchParams({
-    from: pickers.xfrom.value,
+    from: pickers.xfrom.commit(),
     dateFrom: ranges.explore.from, dateTo: ranges.explore.to,
     maxPrice: $('xmax').value,
   });
-  if (pickers.xcountry.value) q.set('country', pickers.xcountry.value);
+  if (pickers.xcountry.commit()) q.set('country', pickers.xcountry.value);
   if (after > 0) q.set('after', `${String(after).padStart(2, '0')}:00`);
   if (before < 24) q.set('before', `${String(before).padStart(2, '0')}:00`);
 
@@ -481,20 +627,12 @@ $('exploreForm').addEventListener('submit', async (e) => {
 
     $('xidle').classList.add('hidden');
     $('xhead').classList.remove('hidden');
-      const scope = pickers.xcountry.value || 'anywhere';
+    const scope = pickers.xcountry.value || 'anywhere';
     $('xtitle').textContent = `${airports.find(a => a.code === data.origin)?.city ?? data.origin} → ${scope} under €${$('xmax').value}`;
-    $('xcount').textContent = `${data.rows.length} destinations`;
 
-    $('xresults').innerHTML = data.rows.length ? `<table>
-      <thead><tr><th>Fare</th><th>Where</th><th>Country</th><th>Departs</th><th>Flight</th><th></th></tr></thead>
-      <tbody>${data.rows.map(r => `<tr>
-        <td class="num">${money(r.price, r.currency)}</td>
-        <td><strong>${r.city}</strong> <span style="color:var(--muted)">${r.code}</span>${r.newRoute ? ' <span class="chip chip-direct">new</span>' : ''}</td>
-        <td style="color:var(--ink-2)">${r.country}</td>
-        <td class="dim">${dayName(r.day)} ${r.depLocal}→${r.arrLocal}</td>
-        <td class="dim">${r.flight}</td>
-        <td><a class="book" href="${r.book}" target="_blank" rel="noopener">Book</a></td>
-      </tr>`).join('')}</tbody></table>` : '';
+    state.xrows = data.rows;
+    state.xpage = 1;
+    renderExplore();
 
     if (!data.rows.length) {
       $('xidle').classList.remove('hidden');

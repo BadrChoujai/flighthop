@@ -32,6 +32,22 @@ async function airportIndex() {
 }
 export const allAirports = async () => (await airportIndex()).list;
 
+/**
+ * Closest served airport to a point. Used to guess where the visitor is starting
+ * from, so the form arrives already filled in.
+ */
+export async function nearestAirport(lat, lon) {
+  const { byCode } = await airportIndex();
+  const here = { coordinates: { latitude: lat, longitude: lon } };
+  let best = null;
+  for (const a of byCode.values()) {
+    if (!a.coordinates) continue;
+    const km = distanceKm(here, a);
+    if (!best || km < best.km) best = { code: a.code, city: a.city.name, country: a.country.name, km: Math.round(km) };
+  }
+  return best;
+}
+
 const rad = (d) => d * Math.PI / 180;
 function distanceKm(a, b) {
   const [la1, lo1, la2, lo2] = [a.coordinates.latitude, a.coordinates.longitude,

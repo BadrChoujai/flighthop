@@ -46,7 +46,11 @@ export class PlacePicker {
     this.input.autocomplete = 'off';
 
     this.input.addEventListener('focus', () => this.show());
-    this.input.addEventListener('input', () => { this.query = this.input.value; this.show(); });
+    this.input.addEventListener('input', () => {
+      this.query = this.input.value;
+      this.value = '';          // typing over a choice invalidates it until re-picked
+      this.show();
+    });
     this.input.addEventListener('keydown', (e) => this.onKey(e));
     this.list.addEventListener('mousedown', (e) => {
       const row = e.target.closest('[data-code]');
@@ -91,6 +95,18 @@ export class PlacePicker {
     this.query = '';
     this.hide();
     if (!silent) this.input.dispatchEvent(new CustomEvent('picked', { bubbles: true, detail: { code } }));
+  }
+
+  /**
+   * Resolve whatever is typed to a real place, for submit handlers. Someone who
+   * types "vienna" and hits Search without touching the list means Vienna — not
+   * an empty field.
+   */
+  commit() {
+    if (this.value) return this.value;
+    const [best] = this.rank(this.input.value);
+    if (best) this.choose(best.code, { silent: true });
+    return this.value;
   }
 
   rank(q) {

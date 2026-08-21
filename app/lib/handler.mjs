@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { join, dirname, extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { search, allAirports, resolveTargets } from './search.mjs';
+import { search, allAirports, resolveTargets, nearestAirport } from './search.mjs';
 import { anywhereFares, bookingUrl } from './ryanair.mjs';
 import { stats } from './cache.mjs';
 
@@ -61,6 +61,23 @@ export default async function handler(req, res) {
 
     if (url.pathname === '/api/health') {
       return json(res, 200, { ok: true, cache: stats() });
+    }
+
+    // Where the visitor is, so the origin field arrives filled in. Vercel attaches
+    // the coordinates to the request, which beats asking the browser for permission
+    // on page load. Locally the headers are absent and the field just stays empty.
+    if (url.pathname === '/api/where') {
+      const lat = Number(req.headers['x-vercel-ip-latitude']);
+      const lon = Number(req.headers['x-vercel-ip-longitude']);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        return json(res, 200, { known: false });
+      }
+      const airport = await nearestAirport(lat, lon);
+      return json(res, 200, {
+        known: !!airport,
+        country: req.headers['x-vercel-ip-country'] ?? null,
+        airport,
+      });
     }
 
     // Streaming search: hubs resolve one at a time and the UI says which.
