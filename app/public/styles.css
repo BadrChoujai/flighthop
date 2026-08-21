@@ -127,6 +127,7 @@ header {
 }
 header .wrap { padding-bottom: 0; }
 .headrow { display: flex; align-items: center; gap: 18px; }
+.tabs { margin-left: auto; }
 .brand { margin: 0; white-space: nowrap; }
 .brand button {
   font-family: var(--display);
@@ -363,7 +364,7 @@ button.go:disabled { opacity: .55; cursor: default; }
 .rail { position: sticky; top: 86px; display: grid; gap: 14px; align-content: start; }
 /* Grid and flex children refuse to shrink past their content unless told to. */
 .rail > *, .rail section > *, .ctrl, .ctrl-head { min-width: 0; }
-.seg-toggle button { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rail .seg-toggle button { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rail section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 15px 16px; }
 .rail h4 {
   font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;

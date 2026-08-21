@@ -26,6 +26,14 @@ const hrsCompact = (h) => h >= 1
   : `${Math.round(h * 60)}m`;
 const hrsShort = (h) => (h >= 1 ? `${Math.round(h)}h` : `${Math.round(h * 60)}m`);
 
+/** Slider readouts: "2h", "2h 30m" — never "2.0 h". */
+const hoursLabel = (v) => {
+  const n = Number(v);
+  const h = Math.floor(n);
+  const m = Math.round((n - h) * 60);
+  return m ? `${h}h ${m}m` : `${h}h`;
+};
+
 /* A label that does not fit its segment gets clipped at both ends, and a clipped
    "3h 20m in Barcelona" reads as a 20-minute connection. So measure the text and
    step down to a shorter form — or to nothing — rather than let it be cut. */
@@ -244,8 +252,8 @@ const bind = (id, out, fmt, onChange) => {
   el.addEventListener('input', update);
   update();
 };
-bind('minLayover', 'minLayoutOut', v => `${Number(v).toFixed(1)} h`, () => rerank());
-bind('maxLayover', 'maxLayoutOut', v => `${v} h`, () => rerank());
+bind('minLayover', 'minLayoutOut', hoursLabel, () => rerank());
+bind('maxLayover', 'maxLayoutOut', hoursLabel, () => rerank());
 bind('tightPenalty', 'tightOut', v => `€${v}/h`, () => rerank());
 bind('longPenalty', 'longOut', v => `€${v}/h`, () => rerank());
 bind('maxPrice', 'maxPriceOut', v => (Number(v) === 0 ? 'any' : `€${v}`), () => rerank());
