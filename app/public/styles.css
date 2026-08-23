@@ -21,9 +21,6 @@
   --risk: #ab3c2b;
   --risk-soft: #f7ded9;
   --shadow: 0 1px 2px rgba(14,26,30,.06), 0 10px 26px -14px rgba(14,26,30,.22);
-  /* Width of the prose column on "How it works" — a readable measure, starting
-     at the same left edge as every other page. */
-  --reading: 68ch;
   --sans: "Segoe UI Variable Text", "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --display: "Segoe UI Variable Display", "Segoe UI Semibold", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   --mono: "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, "SF Mono", monospace;
@@ -829,7 +826,7 @@ td.dim { color: var(--muted); font-family: var(--mono); font-size: 12.5px; font-
 /* Prose keeps a readable measure, but starts at the same left edge as every
    other page rather than being centred — otherwise the header and the content
    both shift inward here and switching tabs makes the whole page jump. */
-.info { max-width: var(--reading); margin: 0; }
+.info { margin: 0; }
 .info section { margin-bottom: 46px; }
 .info h2 {
   font-family: var(--display); font-size: 23px; font-weight: 650;
@@ -947,7 +944,6 @@ footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
   /* Copy first. The illustration explains the headline — leading with it on a
      phone means a screenful of diagram before any words. */
   .hero { grid-template-columns: 1fr; gap: 22px; padding-top: 8px; }
-  .hero-art { max-width: 420px; margin: 0 auto; }
   .closing { flex-direction: column; align-items: flex-start; }
 }
 @media (max-width: 900px) {
