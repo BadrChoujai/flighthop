@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
 const state = {
   result: null, sort: 'score', pinnedDay: null, expanded: new Set(),
   shown: 15, xrows: [], xshown: 15, lastSearchView: 'search',
-  maxTickets: 2, loadedStops: null, trip: 'one',
+  maxTickets: 2, loadedStops: null, trip: 'one', xsearched: false, gsearched: false,
   grows: [], gshown: 15, stay: 'any', whenPreset: 'this',
 };
 const PAGE_SIZE = 15;
@@ -86,6 +86,12 @@ addEventListener('resize', () => {
   clearTimeout(refitTimer);
   refitTimer = setTimeout(fitBarLabels, 120);
 });
+
+/* Wait for the slider to settle before acting on it. */
+const debounce = (fn, ms = 450) => {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+};
 
 const money = (v, c) => (c === 'EUR' ? '€' : c + ' ') + Math.round(v);
 
@@ -191,7 +197,6 @@ function showTab(which) {
   $('tab-getaway').setAttribute('aria-selected', String(which === 'getaway'));
   $('tab-info').setAttribute('aria-pressed', String(which === 'info'));
   $('tab-info').textContent = which === 'info' ? 'Back to search' : 'How it works';
-  document.body.classList.toggle('reading', which === 'info');
   document.body.classList.toggle('landing', which === 'home');
 
   // Replay the entrance animation when the view actually changes, so switching
@@ -369,9 +374,15 @@ addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && document.body.classList.contains('filters-open')) setFilters(false);
 });
 
-bind('xmax', 'xmaxOut', v => `€${v}`);
-bind('xafter', 'xafterOut', v => (Number(v) === 0 ? 'any' : `${String(v).padStart(2, '0')}:00`));
-bind('xbefore', 'xbeforeOut', v => (Number(v) === 24 ? 'any' : `${String(v).padStart(2, '0')}:00`));
+/* Unlike the Connect filters, these are query parameters rather than a view over
+   results already in hand — so changing one means asking again. Debounced, and
+   only once there is a search to redo. */
+const rerunExplore = debounce(() => {
+  if (state.xsearched) $('exploreForm').requestSubmit();
+});
+bind('xmax', 'xmaxOut', v => `€${v}`, rerunExplore);
+bind('xafter', 'xafterOut', v => (Number(v) === 0 ? 'any' : `${String(v).padStart(2, '0')}:00`), rerunExplore);
+bind('xbefore', 'xbeforeOut', v => (Number(v) === 24 ? 'any' : `${String(v).padStart(2, '0')}:00`), rerunExplore);
 
 /* ---------- the two-tickets warning ----------
    It has to be read once, not every session forever. Dismissing it sticks, and
@@ -961,6 +972,7 @@ $('exploreForm').addEventListener('submit', async (e) => {
 
     state.xrows = data.rows;
     state.xshown = PAGE_SIZE;
+    state.xsearched = true;
     renderExplore();
 
     if (!data.rows.length) {
@@ -1030,7 +1042,10 @@ $('stayChips').addEventListener('click', (e) => {
   renderGetaway();
 });
 
-bind('gmax', 'gmaxOut', v => `€${v}`);
+const rerunGetaway = debounce(() => {
+  if (state.gsearched) $('getawayForm').requestSubmit();
+});
+bind('gmax', 'gmaxOut', v => `€${v}`, rerunGetaway);
 $('gFilterFab').onclick = () => document.body.classList.add('filters-open');
 $('gCloseFilters').onclick = () => document.body.classList.remove('filters-open');
 
@@ -1076,6 +1091,7 @@ $('getawayForm').addEventListener('submit', async (e) => {
     const res = await fetch('/api/getaway?' + q);
     const data = await res.json();
     if (!res.ok) throw new Error(data.message);
+    state.gsearched = true;
     state.grows = data.rows;
     state.cheapestThatFits = data.cheapestThatFits;
     state.gshown = PAGE_SIZE;

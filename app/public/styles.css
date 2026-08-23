@@ -21,8 +21,8 @@
   --risk: #ab3c2b;
   --risk-soft: #f7ded9;
   --shadow: 0 1px 2px rgba(14,26,30,.06), 0 10px 26px -14px rgba(14,26,30,.22);
-  /* Width of the prose column on "How it works". The header borrows it there so
-     the two line up on the same left and right edges. */
+  /* Width of the prose column on "How it works" — a readable measure, starting
+     at the same left edge as every other page. */
   --reading: 68ch;
   --sans: "Segoe UI Variable Text", "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --display: "Segoe UI Variable Display", "Segoe UI Semibold", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
@@ -765,10 +765,6 @@ td.dim { color: var(--muted); font-family: var(--mono); font-size: 12.5px; font-
 .hero-art svg { width: 100%; height: auto; overflow: visible; }
 .art-grid path { stroke: var(--line-soft); stroke-width: 1; stroke-dasharray: 3 7; }
 .art-direct path { stroke: var(--muted); stroke-width: 1.6; fill: none; stroke-dasharray: 6 6; opacity: .55; }
-.art-direct text {
-  fill: var(--muted); font-family: var(--mono); font-size: 11px;
-  text-anchor: middle; letter-spacing: .04em;
-}
 .art-cross path { stroke: var(--risk); stroke-width: 2.4; opacity: .9; stroke-dasharray: none; stroke-linecap: round; }
 .art-hop {
   fill: none; stroke: var(--accent); stroke-width: 3.2; stroke-linecap: round;
@@ -777,13 +773,11 @@ td.dim { color: var(--muted); font-family: var(--mono); font-size: 12.5px; font-
 .art-hop-1 { --len: 210; animation-delay: .35s; }
 .art-hop-2 { --len: 210; animation-delay: 1.1s; }
 .art-node circle { fill: var(--surface); stroke: var(--accent); stroke-width: 3; }
-.art-node-hub circle { stroke: var(--wait); }
 .art-node text {
   fill: var(--ink-2); font-family: var(--mono); font-size: 12px;
   font-weight: 600; text-anchor: middle;
 }
 .art-node-a { animation: fade .4s ease .3s both; }
-.art-node-hub { animation: fade .4s ease 1.15s both; }
 .art-node-b { animation: fade .4s ease 1.95s both; }
 
 /* ---------- what you get ---------- */
@@ -832,13 +826,10 @@ td.dim { color: var(--muted); font-family: var(--mono); font-size: 12.5px; font-
 .infolink:hover { color: var(--accent); border-color: var(--accent); }
 .infolink[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 
-.info { max-width: var(--reading); margin: 0 auto; }
-
-/* On the reading page the search bar is gone, so the header would otherwise
-   collapse to the far left while the prose sits centred. Narrow the header to
-   the prose column and push its ends to the same edges. */
-body.reading header .wrap { max-width: calc(var(--reading) + 48px); }
-body.reading .headrow { justify-content: space-between; }
+/* Prose keeps a readable measure, but starts at the same left edge as every
+   other page rather than being centred — otherwise the header and the content
+   both shift inward here and switching tabs makes the whole page jump. */
+.info { max-width: var(--reading); margin: 0; }
 .info section { margin-bottom: 46px; }
 .info h2 {
   font-family: var(--display); font-size: 23px; font-weight: 650;
