@@ -844,6 +844,10 @@ td.dim { color: var(--muted); font-family: var(--mono); font-size: 12.5px; font-
 }
 .callout strong { color: var(--wait); }
 
+/* A scope statement, not a warning — same shape, the accent rather than the amber. */
+.callout-scope { border-left-color: var(--accent); background: var(--accent-soft); }
+.callout-scope strong { color: var(--accent); }
+
 .tagdoc { display: grid; gap: 1px; background: var(--line-soft); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .tagdoc-row { display: grid; grid-template-columns: 116px 1fr; gap: 16px; padding: 16px 18px; background: var(--surface); align-items: start; }
 .tagdoc-row .chip { margin-top: 2px; }
@@ -1139,4 +1143,21 @@ footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
   /* Declared here, after the base rule above — otherwise source order wins at
      equal specificity and these two fields keep zooming the page on tap. */
   .field select { font-size: 16px; }
+}
+
+/* The fare-plus-bags breakdown. It lives in the wide column beside the itinerary,
+   not under the headline — the price column is 104px and this is a sentence. Only
+   rendered when luggage is actually selected, so the default view is unchanged. */
+.bagline {
+  display: block; margin-top: 6px;
+  font-family: var(--sans); font-size: 11.5px; font-weight: 500;
+  line-height: 1.4; color: var(--muted); letter-spacing: 0;
+}
+/* .legs is a wrapping flex row with space-between — without a full-width basis the
+   breakdown would be pulled up beside the itinerary line and split it apart. */
+.legs .bagline { flex: 0 0 100%; }
+
+.bagline em {
+  font-style: normal; font-weight: 600;
+  color: color-mix(in oklab, var(--muted) 75%, var(--ink));
 }

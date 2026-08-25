@@ -255,6 +255,16 @@
         </section>
 
         <section>
+          <h4>Bags</h4>
+          <div class="chips" id="bagChips" role="group" aria-label="What you are carrying">
+            <button data-bag="none" aria-pressed="true">Personal only</button>
+            <button data-bag="cabin" aria-pressed="false">Cabin bag</button>
+            <button data-bag="c10" aria-pressed="false">Checked 10 kg</button>
+            <button data-bag="c20" aria-pressed="false">Checked 20 kg</button>
+          </div>
+          <p class="chips-note" id="bagNote">Small bag under the seat. Free on every fare.</p>
+        </section>
+        <section>
           <h4>Budget</h4>
           <div class="ctrl">
             <div class="ctrl-head"><label for="maxPrice">Total fare under</label><b id="maxPriceOut">any</b></div>
@@ -484,6 +494,11 @@
 
       <section>
         <h2>What this actually does</h2>
+        <p class="callout callout-scope"><strong>One airline only.</strong> Flighthop searches
+          Ryanair and nothing else. Every route, price and time here comes from Ryanair's own
+          network, so a connection only appears if Ryanair flies both legs. Trips that would work
+          by pairing two different airlines are invisible to this app — if a journey looks
+          impossible here, check a multi-airline search before believing it.</p>
         <p>Airlines sell you routes they have already decided exist. Plenty of city pairs are joined
           by the same airline at both ends and still cannot be bought as one journey — search for
           them and you get nothing back.</p>
@@ -614,6 +629,29 @@
           </details>
 
           <details>
+            <summary>How is the luggage cost worked out?</summary>
+            <p>A bag is priced per booking, and every ticket in a self-connection is a separate
+              booking. So a direct return pays the bag fee twice, while the same trip through two
+              hubs pays it four times. Rank on the fare alone and connections win comparisons they
+              would lose at the till — which is why the Bags filter feeds straight into the
+              ranking rather than sitting in a footnote.</p>
+            <p><strong>The figures are estimates, not quotes.</strong> Ryanair publishes no fee
+              endpoint, so we use typical amounts — about €20 a flight for a cabin bag, €25 for
+              10 kg checked, €40 for 20 kg. Real fees move with route, season and how late you add
+              the bag. The shape of the comparison is reliable; the exact total is not.</p>
+          </details>
+
+          <details>
+            <summary>Why only Ryanair?</summary>
+            <p>Because the whole method depends on reading one airline's route map as a graph, and
+              Ryanair's is both the largest in Europe and the most point-to-point — which is
+              exactly what creates city pairs it serves at both ends but will not sell as one
+              journey. Adding a second airline is not a matter of another data source: layover
+              risk, bag rules and terminal transfers all differ per carrier, and getting that
+              wrong sells someone a connection they cannot make.</p>
+          </details>
+
+          <details>
             <summary>Do I have to collect my bags at the connection?</summary>
             <p>Yes, on every connection here. Bags are checked to the connecting airport only.
               Factor in the belt, the walk, and a check-in desk that may not open until two hours
@@ -623,10 +661,13 @@
 
           <details>
             <summary>Are the prices what I will actually pay?</summary>
-            <p>They are the fare for one adult with a cabin bag, at the moment we asked. Checked
-              bags, seat selection and priority are not included, and fares move — sometimes
-              within the hour. Treat every number here as "worth looking at", then confirm on the
-              airline's page before committing.</p>
+            <p>The fare is for one adult with a small bag under the seat, at the moment we asked.
+              Seat selection and priority are not included, and fares move — sometimes within the
+              hour. Treat every number here as "worth looking at", then confirm on Ryanair's page
+              before committing.</p>
+            <p>Luggage is different, because it is the thing that most often flips which trip is
+              actually cheapest. Pick what you are carrying in the Bags filter and every price
+              becomes the all-in cost.</p>
           </details>
 
           <details>

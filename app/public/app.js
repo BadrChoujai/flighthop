@@ -8,13 +8,45 @@ const state = {
   result: null, sort: 'score', pinnedDay: null, expanded: new Set(),
   shown: 15, xrows: [], xshown: 15, lastSearchView: 'search',
   maxTickets: 2, loadedStops: null, trip: 'one', xsearched: false, gsearched: false,
-  grows: [], gshown: 15, stay: 'any', whenPreset: 'this',
+  grows: [], gshown: 15, stay: 'any', whenPreset: 'this', bag: 'none',
 };
 const PAGE_SIZE = 15;
 
 /* The values every slider starts at, so "how many filters are active" and
    "clear all" have a single definition to work from. */
 const FILTER_DEFAULTS = { minLayover: '2', maxLayover: '18', maxPrice: '0', tightPenalty: '25', longPenalty: '8' };
+
+/*
+ * What luggage costs, per flight.
+ *
+ * This is the asymmetry that makes self-connecting look cheaper than it is: a
+ * bag is priced per booking, and every ticket in a stitched itinerary is its own
+ * booking. A direct return pays twice; the same trip through two hubs pays four
+ * times. Rank on the fare alone and the connection always wins a comparison it
+ * would lose at the till.
+ *
+ * Ryanair publishes no fee endpoint — nothing in the backend the rest of this app
+ * reads carries a price for a bag — so these are typical figures, not quotes, and
+ * the interface says so wherever it uses them. Real fees move with route, season
+ * and how late you add the bag.
+ */
+const BAGS = {
+  none: { fee: 0,  label: 'Personal only', note: 'Small bag under the seat. Free on every fare.' },
+  cabin: { fee: 20, label: 'Cabin bag', note: '10 kg in the locker, roughly €20 a flight — bought once per ticket.' },
+  c10: { fee: 25, label: 'Checked 10 kg', note: 'Roughly €25 a flight, and collected and re-checked at every hub.' },
+  c20: { fee: 40, label: 'Checked 20 kg', note: 'Roughly €40 a flight, and collected and re-checked at every hub.' },
+};
+
+/** Flights in an itinerary, both directions of a return included. */
+const flightCount = (it) => it.kind === 'return'
+  ? it.out.legs.length + it.back.legs.length
+  : it.legs.length;
+
+/** Estimated luggage cost for a whole itinerary, at the current choice. */
+const bagCost = (it) => BAGS[state.bag].fee * flightCount(it);
+
+/** Fare plus luggage — what the trip actually costs to take. */
+const trueCost = (it) => it.price + bagCost(it);
 
 /* ---------- helpers ---------- */
 const hrs = (h) => h >= 1
@@ -309,6 +341,18 @@ $('ticketChips').addEventListener('click', (e) => {
   else rerank();
 });
 
+/* Luggage is a filter, not a search parameter: the server never sees it, so
+   changing it re-ranks what is already on screen. */
+$('bagChips').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-bag]');
+  if (!btn) return;
+  state.bag = btn.dataset.bag;
+  press($('bagChips'), btn);
+  $('bagNote').textContent = BAGS[state.bag].note;
+  paintFilterCount();
+  rerank();
+});
+
 /* ---------- back to top ----------
    Appears once the header has scrolled well out of reach, which is the point at
    which getting back becomes a chore. */
@@ -333,6 +377,7 @@ function activeFilterCount() {
   for (const [id, value] of Object.entries(FILTER_DEFAULTS)) if ($(id).value !== value) n++;
   if ($('noOvernight').checked) n++;
   if (state.maxTickets !== 2) n++;
+  if (state.bag !== 'none') n++;
   return n;
 }
 
@@ -354,6 +399,9 @@ $('clearFilters').onclick = () => {
   state.maxTickets = 2;
   press($('ticketChips'), $('ticketChips').querySelector('[data-tickets="2"]'));
   paintTicketsNote();
+  state.bag = 'none';
+  press($('bagChips'), $('bagChips').querySelector('[data-bag="none"]'));
+  $('bagNote').textContent = BAGS.none.note;
   rerank();
 };
 
@@ -539,11 +587,16 @@ function visible() {
     .filter(it => (it.kind === 'return'
       ? Math.max(it.out.legs.length, it.back.legs.length)
       : (it.tickets ?? 1)) <= state.maxTickets)
-    .filter(it => !cap || it.price <= cap)
+    // "Under €X" means what you pay, so luggage counts against the budget too.
+    .filter(it => !cap || trueCost(it) <= cap)
     .filter(it => !(hideNight && flagsOf(it).some(f => f.id === 'overnight')))
     .filter(it => !state.pinnedDay || legsOf(it)[0].depDate === state.pinnedDay)
     .map(it => {
-      if (it.kind === 'direct') return { ...it, score: it.price };
+      // Luggage is part of the price of every option, direct ones included, so it
+      // belongs in the score rather than in a caveat under it.
+      const bags = bagCost(it);
+      const cost = it.price + bags;
+      if (it.kind === 'direct') return { ...it, bags, cost, score: cost };
       const overnight = flagsOf(it).some(f => f.id === 'overnight');
       const border = flagsOf(it).some(f => f.id === 'border');
       const penalty = waitsOf(it).reduce((sum, wait) =>
@@ -552,7 +605,7 @@ function visible() {
         + (wait > 8 ? (wait - 8) * long : 0), 0)
         + (overnight ? 60 : 0) + (border ? 30 : 0)
         + (it.tickets - 1) * 20;
-      return { ...it, score: it.price + penalty };
+      return { ...it, bags, cost, score: cost + penalty };
     });
 
   if (state.sort === 'stopover') {
@@ -560,11 +613,12 @@ function visible() {
     return scored
       .map(it => ({ ...it, stopover: bestStopover(it) }))
       .sort((a, b) =>
-        (b.stopover?.hours ?? -1) - (a.stopover?.hours ?? -1) || a.price - b.price);
+        (b.stopover?.hours ?? -1) - (a.stopover?.hours ?? -1) || a.cost - b.cost);
   }
 
-  const key = state.sort;
-  scored.sort((a, b) => (a[key] ?? a.price) - (b[key] ?? b.price));
+  // "Cheapest" sorts on the all-in cost; the other keys are unaffected.
+  const key = state.sort === 'price' ? 'cost' : state.sort;
+  scored.sort((a, b) => (a[key] ?? a.cost) - (b[key] ?? b.cost));
   return scored;
 }
 
@@ -722,13 +776,28 @@ function trackFor(it, maxSpan, seg) {
   </div>`;
 }
 
+/* When luggage is priced in, the headline is the all-in cost and the fare is shown
+   underneath — the estimate is labelled, because it is one. */
+function costParts(it) {
+  const bags = it.bags ?? bagCost(it);
+  const n = flightCount(it);
+  return {
+    headline: money(it.price + bags, it.currency),
+    line: bags
+      ? `<span class="bagline">${money(it.price, it.currency)} fare + ${money(bags, it.currency)} bags` +
+        ` across ${n} flight${n === 1 ? '' : 's'} <em>est.</em></span>`
+      : '',
+  };
+}
+
 function returnCard(it, i, maxSpan, seg) {
   const id = `return-${it.out.legs.map(l => l.from + l.day + l.depLocal).join('-')}-${it.back.legs[0].day}`;
   const open = state.expanded.has(id);
   const arrival = it.out.legs.at(-1).to;
+  const cost = costParts(it);
 
   return `<div class="card card-return ${open ? 'open' : ''}" data-id="${id}" data-i="${i}">
-    <div class="price">${money(it.price, it.currency)}
+    <div class="price">${cost.headline}
       <span class="dest">${cityOf(arrival)} <span class="code">${arrival}</span></span>
       <small>${dayName(it.out.legs[0].depDate)} · ${it.nights} night${it.nights === 1 ? '' : 's'}</small>
       <span class="ticketpill">${it.tickets} tickets</span>
@@ -736,6 +805,7 @@ function returnCard(it, i, maxSpan, seg) {
     <div class="legsstack">
       <div class="dirrow"><span class="dir">Out</span>${trackFor(it.out, maxSpan, seg)}</div>
       <div class="dirrow"><span class="dir dir-back">Back</span>${trackFor(it.back, maxSpan, seg)}</div>
+      ${cost.line}
     </div>
     ${open ? `<div class="detail">
       <div class="detail-part"><span class="k">Outbound</span>${detail(it.out)}</div>
@@ -784,6 +854,7 @@ function card(it, i, maxSpan) {
   const via = it.kind === 'direct' ? ''
     : ` · via <span class="via">${it.hubs.map(cityOf).join(', ')}</span>`;
 
+  const cost = costParts(it);
   const stop = bestStopover(it);
   const stopLine = stop
     ? `<div class="freeday">${stop.hours >= 6 ? 'A free day' : 'Time enough'} in ${stop.city}
@@ -791,7 +862,7 @@ function card(it, i, maxSpan) {
     : '';
 
   return `<div class="card ${open ? 'open' : ''}" data-id="${id}" data-i="${i}">
-    <div class="price">${money(it.price, it.currency)}
+    <div class="price">${cost.headline}
       <span class="dest">${destination}</span>
       <small>${dayName(it.legs[0].depDate)}${via}</small>
     </div>
@@ -800,6 +871,7 @@ function card(it, i, maxSpan) {
       <div class="legs">
         <span>${legLine}</span>
         <span>${tickets} ${chip} &nbsp; ${hrs(it.total)} door to door</span>
+        ${cost.line}
       </div>
       ${stopLine}
     </div>
