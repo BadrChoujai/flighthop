@@ -904,6 +904,14 @@ footer {
   border-top: 1px solid var(--line-soft);
   font-size: 13px; color: var(--muted); text-align: center;
 }
+footer p { margin: 0 0 8px; }
+footer p:last-child { margin-bottom: 0; }
+
+/* The non-affiliation notice sits on every page rather than inside an FAQ. It is
+   the one line a reader might need before they trust anything else here. */
+.foot-disclaimer { max-width: 62ch; margin-inline: auto; line-height: 1.5; }
+.foot-disclaimer strong { color: var(--ink-2); }
+
 footer a { color: var(--ink-2); font-weight: 600; text-decoration: none; border-bottom: 1px solid var(--line); }
 footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
 
