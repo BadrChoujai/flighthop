@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { search, allAirports, resolveTargets, nearestAirport, zoneOf } from './search.mjs';
 import { anywhereFares, roundTripFares, bookingUrl, localToUtc, hours } from './ryanair.mjs';
 import { stats } from './cache.mjs';
+import { configured } from './endpoints.mjs';
 
 const publicDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
@@ -90,7 +91,9 @@ export default async function handler(req, res) {
     }
 
     if (url.pathname === '/api/health') {
-      return json(res, 200, { ok: true, cache: stats() });
+      const upstream = configured();
+      const ready = Object.values(upstream).every(Boolean);
+      return json(res, 200, { ok: true, ready, upstream, cache: stats() });
     }
 
     // Where the visitor is, so the origin field arrives filled in. Vercel attaches

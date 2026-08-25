@@ -1,9 +1,11 @@
 // Client for the public Ryanair endpoints. Everything goes through the cache and
 // a concurrency gate — these are an airline's own backend, not a public API.
+//
+// The endpoints themselves live in the environment, not here; see endpoints.mjs.
 
 import { through, TTL } from './cache.mjs';
+import { base, path, booking } from './endpoints.mjs';
 
-const BASE = 'https://www.ryanair.com';
 const UA = 'Mozilla/5.0 (Flighthop)';
 const MAX_CONCURRENT = 4;
 
@@ -20,16 +22,16 @@ function release() {
   if (next) { active++; next(); }
 }
 
-async function fetchJson(path, attempt = 0) {
+async function fetchJson(url, attempt = 0) {
   await gate();
   try {
-    const res = await fetch(BASE + path, {
+    const res = await fetch(base() + url, {
       headers: { 'User-Agent': UA, accept: 'application/json' },
       signal: AbortSignal.timeout(20_000),
     });
     if (res.status === 429 || res.status >= 500) throw new Error(`upstream ${res.status}`);
     if (!res.ok) {
-      const err = new Error(`${res.status} on ${path}`);
+      const err = new Error(`${res.status} on ${url}`);
       err.status = res.status;
       throw err;
     }
@@ -37,7 +39,7 @@ async function fetchJson(path, attempt = 0) {
   } catch (e) {
     if (attempt < 2 && !e.status) {
       await new Promise(r => setTimeout(r, 400 * 2 ** attempt));
-      return fetchJson(path, attempt + 1);
+      return fetchJson(url, attempt + 1);
     }
     throw e;
   } finally {
@@ -47,12 +49,12 @@ async function fetchJson(path, attempt = 0) {
 
 /** Airport master table: country, coordinates, IANA timezone. */
 export const airports = () =>
-  through('airports:v5', TTL.airports, () => fetchJson('/api/views/locate/5/airports/en/active'));
+  through('airports:v5', TTL.airports, () => fetchJson(path('airports')));
 
 /** Every route out of an airport — the edge list of the network. */
 export const routesFrom = (code) =>
   through(`routes:${code}`, TTL.routes, async () => {
-    const rows = await fetchJson(`/api/views/locate/searchWidget/routes/en/airport/${code}`);
+    const rows = await fetchJson(path('routes', { code }));
     return rows.map(r => ({
       code: r.arrivalAirport.code,
       seasonal: !!r.seasonal,
@@ -63,7 +65,7 @@ export const routesFrom = (code) =>
 /** One month of a route: cheapest fare per day, with local departure/arrival times. */
 export const cheapestPerDay = (from, to, month, currency = 'EUR') =>
   through(`fares:${from}:${to}:${month}:${currency}`, TTL.fares, () =>
-    fetchJson(`/api/farfnd/v4/oneWayFares/${from}/${to}/cheapestPerDay` +
+    fetchJson(path('cheapestPerDay', { from, to }) +
               `?outboundMonthOfDate=${month}&currency=${currency}`));
 
 /**
@@ -75,7 +77,7 @@ export const cheapestPerDay = (from, to, month, currency = 'EUR') =>
 export const timetable = (from, to, month) =>
   through(`timtbl:${from}:${to}:${month}`, TTL.routes, async () => {
     const [year, mon] = month.split('-');
-    const data = await fetchJson(`/api/timtbl/3/schedules/${from}/${to}/years/${year}/months/${Number(mon)}`);
+    const data = await fetchJson(path('timetable', { from, to, year, month: Number(mon) }));
     const out = {};
     for (const d of data?.days ?? []) {
       if (!d.flights?.length) continue;
@@ -92,7 +94,7 @@ export const timetable = (from, to, month) =>
 /** Dates a route operates at all. Cheap pre-filter. */
 export const availableDates = (from, to) =>
   through(`dates:${from}:${to}`, TTL.dates, () =>
-    fetchJson(`/api/farfnd/v4/oneWayFares/${from}/${to}/availabilities`));
+    fetchJson(path('availabilities', { from, to })));
 
 /** "Anywhere" search: one call ranks every destination, and returns flight numbers. */
 export function anywhereFares(origin, opts = {}) {
@@ -109,7 +111,7 @@ export function anywhereFares(origin, opts = {}) {
   if (opts.arrivals?.length) q.set('arrivalAirportIataCodes', opts.arrivals.join(','));
   if (opts.timeFrom) q.set('outboundDepartureTimeFrom', opts.timeFrom);
   if (opts.timeTo) q.set('outboundDepartureTimeTo', opts.timeTo);
-  return through(`anywhere:${q}`, TTL.fares, () => fetchJson(`/api/farfnd/v4/oneWayFares?${q}`));
+  return through(`anywhere:${q}`, TTL.fares, () => fetchJson(`${path('oneWayFares')}?${q}`));
 }
 
 /**
@@ -135,7 +137,7 @@ export function roundTripFares(origin, opts = {}) {
   if (opts.outBefore) q.set('outboundDepartureTimeTo', opts.outBefore);
   if (opts.backAfter) q.set('inboundDepartureTimeFrom', opts.backAfter);
   if (opts.backBefore) q.set('inboundDepartureTimeTo', opts.backBefore);
-  return through(`round:${q}`, TTL.fares, () => fetchJson(`/api/farfnd/v4/roundTripFares?${q}`));
+  return through(`round:${q}`, TTL.fares, () => fetchJson(`${path('roundTripFares')}?${q}`));
 }
 
 /**
@@ -156,9 +158,6 @@ export function localToUtc(localIso, timeZone) {
 }
 
 /** Deep link into Ryanair's own booking flow for a single leg. */
-export const bookingUrl = (from, to, date) =>
-  `https://www.ryanair.com/gb/en/trip/flights/select?adults=1&teens=0&children=0&infants=0` +
-  `&dateOut=${date}&isConnectedFlight=false&isReturn=false&discount=0` +
-  `&originIata=${from}&destinationIata=${to}`;
+export const bookingUrl = (from, to, date) => booking({ from, to, date });
 
 export const hours = (ms) => ms / 3_600_000;

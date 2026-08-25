@@ -17,9 +17,11 @@ npm-debug.log*
 *.tmp
 scratch/
 
-# Secrets — nothing here uses them, and nothing here should start
+# Secrets, and the upstream endpoint configuration. The example file is the
+# documented shape and is meant to be committed; nothing else here is.
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 

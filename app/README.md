@@ -6,11 +6,13 @@ joined only if the layover is one a person could actually make. A connection exi
 here only if Ryanair flies every leg of it.
 
 ```bash
+cp ../.env.example ../.env   # the upstream endpoints; see the root README
 node server.mjs
 ```
 
-Then open <http://localhost:5173>. No install step — the app has **zero dependencies**
-and uses Node's built-in SQLite for its cache. Node 22+ required (tested on 24.16).
+Then open <http://localhost:5173>. Nothing to install — the app has **zero
+dependencies** and uses Node's built-in SQLite for its cache. Node 22+ required
+(tested on 24.16). The interface runs unconfigured; searching is what needs `.env`.
 
 ## What it does
 
@@ -64,7 +66,8 @@ next to the booking buttons.
 ## Layout
 
 ```
-server.mjs          HTTP server, SSE search stream, static files
+server.mjs          HTTP server, loads .env, SSE search stream, static files
+lib/endpoints.mjs   the upstream surface, read from the environment
 lib/ryanair.mjs     API client — cached, concurrency-gated, timezone-correct
 lib/cache.mjs       TTL cache on node:sqlite (airports 30d, routes 3d, fares 6h)
 lib/search.mjs      route graph, geographic pruning, stitching, scoring
@@ -81,7 +84,7 @@ public/             the interface — vanilla, no build step
 | `GET /api/getaway?from&outFrom&outTo&backFrom&backTo&weekends&…` | Round trips that fit a time window |
 | `GET /api/where` | Nearest airport from the request's geo headers |
 | `GET /api/airports` | Airport list for autocomplete |
-| `GET /api/health` | Cache size |
+| `GET /api/health` | Cache size, and which upstream variables are set |
 
 ## Scoring
 

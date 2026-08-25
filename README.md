@@ -27,12 +27,39 @@ Real output. Ryanair's own site says that trip does not exist.
 ## Run it
 
 ```bash
-cd app
-node server.mjs
+cp .env.example .env      # then fill it in — see below
+node app/server.mjs
 ```
 
-Open <http://localhost:5173>. There is **no install step** — the app has zero
-dependencies and uses Node's built-in SQLite for its cache. Node 22+ (tested on 24.16).
+Open <http://localhost:5173>. There are **no dependencies to install** — the app has
+none, and uses Node's built-in SQLite for its cache. Node 22+ (tested on 24.16).
+
+The interface runs before it is configured, so you can look around a fresh clone
+immediately; searching is what needs the endpoints.
+
+## Configuring the upstream
+
+Flighthop reads the endpoints it calls from the environment rather than from source.
+Nothing about them is secret — they are an airline's own website endpoints,
+unauthenticated and visible in any browser's network tab. Keeping them in
+configuration is a question of what this repository *distributes*: source that spells
+them out makes the project a guide for calling them, which is a different thing from a
+search engine that happens to call something.
+
+[.env.example](.env.example) documents every variable: what the endpoint must return,
+which `{placeholders}` it takes, and why the app needs it. Fill it in from your own
+browser's network tab in about five minutes — devtools, Network, filter to Fetch/XHR,
+and read the paths off the requests the site makes as you search.
+
+Deployed, set the same variables in your host's project settings. `GET /api/health`
+reports which are present without revealing their values:
+
+```json
+{ "ok": true, "ready": true, "upstream": { "base": true, "routes": true, … } }
+```
+
+`ready: false` means a variable is missing — which otherwise looks exactly like the
+airline having blocked the host, and the two have very different fixes.
 
 ## What it does
 
@@ -77,9 +104,11 @@ interface says exactly that, next to the booking buttons — not in a footnote.
 ## Layout
 
 ```
+.env.example         every upstream endpoint, documented but not filled in
 app/                 the application
   server.mjs         local dev server — wraps the handler in node:http
   lib/handler.mjs    routes, SSE search stream, static files
+  lib/endpoints.mjs  the upstream surface, read from the environment
   lib/ryanair.mjs    API client — cached, concurrency-gated, timezone-correct
   lib/cache.mjs      TTL cache — SQLite on disk, memory when serverless
   lib/search.mjs     route graph, geographic pruning, stitching, scoring
@@ -150,8 +179,10 @@ disk, memory on a serverless filesystem. A cold search against a completely empt
 cache takes about 1.5 seconds, which is why losing the disk cache is survivable
 rather than fatal.
 
-Import the repository at [vercel.com/new](https://vercel.com/new) — no build
-command, no environment variables, nothing to configure.
+Import the repository at [vercel.com/new](https://vercel.com/new) — no build command
+and nothing to install. Set the variables from `.env.example` in the project's
+environment settings before the first search, and check `/api/health` reports
+`ready: true` afterwards.
 
 One caveat worth testing before wiring up a domain: this talks to an airline's
 undocumented backend, and datacenter IP ranges get filtered far harder than home
