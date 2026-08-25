@@ -32,3 +32,10 @@ scratch/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Added when the Vercel CLI links the project. Its own .env* rule is not kept:
+# it would sit after the negation below and re-ignore the example file.
+.vercel
+
+# Restated last so it wins: the example file documents the shape and is committed.
+!.env.example
