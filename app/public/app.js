@@ -353,6 +353,16 @@ $('bagChips').addEventListener('click', (e) => {
   rerank();
 });
 
+/* The footer's privacy link crosses views: switch to How it works, then scroll to
+   the section, since it is not a page of its own. */
+document.querySelector('[data-privacy]').addEventListener('click', (e) => {
+  e.preventDefault();
+  showTab('info');
+  requestAnimationFrame(() =>
+    document.getElementById('privacy')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+});
+
+
 /* ---------- back to top ----------
    Appears once the header has scrolled well out of reach, which is the point at
    which getting back becomes a chore. */

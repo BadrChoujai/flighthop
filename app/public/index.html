@@ -610,6 +610,50 @@
           door-to-door time.</p>
       </section>
 
+      <section id="privacy">
+        <h2>What this knows about you</h2>
+        <p>Almost nothing, and none of it deliberately. There is no account, no sign-in, no
+          analytics, no advertising and no tracking cookie. Nothing you do here is profiled, and
+          nothing is sold or shared, because none of it is collected in the first place.</p>
+
+        <div class="tagdoc">
+          <div class="tagdoc-row">
+            <span class="chip chip-comfortable">stored</span>
+            <div>
+              <b>Two things, in your own browser</b>
+              <p>Whether you chose the light or dark theme, and whether you dismissed the
+                two-tickets warning. Both live in your browser's local storage, never leave the
+                device, and are gone the moment you clear site data.</p>
+            </div>
+          </div>
+          <div class="tagdoc-row">
+            <span class="chip chip-tight">used, not kept</span>
+            <div>
+              <b>Roughly where you are</b>
+              <p>So the origin field arrives filled in, the server reads the approximate location
+                our host attaches to your request — city-level, derived from your IP address — and
+                turns it into the nearest airport. That happens once, in memory, per request. It
+                is not written down, not logged and not attached to anything you search for.</p>
+            </div>
+          </div>
+          <div class="tagdoc-row">
+            <span class="chip chip-comfortable">cached</span>
+            <div>
+              <b>Fares, not people</b>
+              <p>Search results are cached so a repeated search is instant. The cache holds
+                prices and times, keyed by the search itself — airports, dates, and the limits you
+                set. It contains nothing about who asked, and nothing links an entry to a visitor.</p>
+            </div>
+          </div>
+        </div>
+
+        <p class="callout callout-scope"><strong>Two things outside our hands.</strong> This is
+          hosted on Vercel, which keeps ordinary web-server request logs including IP addresses,
+          under its own privacy policy. And every booking button sends you to Ryanair, where their
+          privacy policy takes over. Neither of those is something Flighthop controls, so both are
+          worth knowing rather than assuming.</p>
+      </section>
+
       <section>
         <h2>Questions</h2>
         <div class="faq">
@@ -728,7 +772,8 @@
       Ryanair.</strong> Flighthop reads publicly available flight and fare information and does
       arithmetic on it. Nothing is sold here — every booking happens on Ryanair's own site.</p>
     <p>Built by <a href="https://github.com/BadrChoujai" target="_blank" rel="noopener">Badr Choujai</a>,
-      after one too many searches came back empty.</p>
+      after one too many searches came back empty.
+      &nbsp;·&nbsp; <a href="#privacy" data-privacy>What this knows about you</a></p>
   </footer>
 </div>
 
