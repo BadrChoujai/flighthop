@@ -469,6 +469,15 @@ export async function search({
   const targets = await resolveTargets(destination);
   if (!targets.length) throw Object.assign(new Error(`No airport matches "${destination}"`), { code: 400 });
 
+  // A return window that ends before the outbound window opens can never pair:
+  // every candidate fails the minimum-stay test and the search returns nothing at
+  // all, with no way for anyone to see why. Say so instead.
+  if (roundTrip && returnTo < from) {
+    throw Object.assign(
+      new Error(`You have asked to fly home by ${returnTo}, before the outbound window opens on ${from}. Check the return dates.`),
+      { code: 400 });
+  }
+
   const window = { from, to };
   const shared = { currency, maxStops, w, byCode, onProgress };
 
