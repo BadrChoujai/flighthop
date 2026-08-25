@@ -7,6 +7,11 @@ there is no such route. But the network connects those two cities fourteen diffe
 ways — through Bergamo, Barcelona, Charleroi, Madrid and others. Nobody sells that
 itinerary, so nobody shows it to you.
 
+**Ryanair only.** Every route, fare and time here comes from Ryanair's own network, so a
+connection exists only if Ryanair flies both legs. Trips that would work by pairing two
+different airlines are invisible to this app. That is the deliberate scope, not a gap
+waiting to be filled — see [What it does not do](#what-it-does-not-do).
+
 Flighthop searches the **route graph** instead of the route list. It stitches separate
 tickets into itineraries, joins them only when the layover is one a person could
 realistically make, and ranks the results by what the trip actually costs someone —
@@ -39,6 +44,12 @@ dependencies and uses Node's built-in SQLite for its cache. Node 22+ (tested on 
 - **Month view** — best price per departure day for the complete itinerary. Click a
   day to pin results to it. The Vienna→Tangier spread for one month runs €35 to €220;
   flexibility is worth more than any booking trick.
+- **Luggage, priced in** — a bag is charged per booking, and every ticket in a
+  self-connection is its own booking. A direct return pays the fee twice; the same trip
+  through two hubs pays it four times. Say what you are carrying and every price becomes
+  the all-in cost, which regularly promotes a direct flight above a "cheaper" connection.
+  Ryanair publishes no fee endpoint, so the amounts are typical figures and the interface
+  labels them as estimates.
 - **Risk, stated plainly** — layover length, bag re-check, border crossing, and
   whether a later flight exists on the second leg if the first one runs late.
 
@@ -84,10 +95,12 @@ product-plan.html    the same plan as a styled page
 
 ```
 score = fare
+      + luggage × number of flights                       (per booking, not per trip)
       + 25 €/h  for every hour the layover is under 3h    (missed-connection risk)
       + 8 €/h   for every hour it runs over 8h            (dead time)
       + 60 €    overnight connection
       + 30 €    a border crossing the trip did not already require
+      + 20 €    per extra ticket                          (another chain to break)
 ```
 
 The first two weights are sliders in the app — "cost of a rushed transfer" and "cost
@@ -95,13 +108,26 @@ of dead time" — so the ranking argues with you rather than at you. A €35 far
 seven-hour wait and a 05:45 alarm should not automatically beat €42 with a three-hour
 wait, and out of the box it doesn't.
 
+## What it does not do
+
+- **One airline.** No easyJet, Wizz, Vueling or anyone else. The method reads a single
+  carrier's route map as a graph; mixing carriers means per-carrier layover rules, bag
+  policies and terminal transfers, and getting those wrong sells someone a connection
+  they cannot make.
+- **No booking.** Every leg links out to Ryanair and you buy them separately. Two
+  tickets is two transactions, and one "Book" button would hide a real cost.
+- **No protection.** If the first flight is late and you miss the second, nobody owes
+  you a seat, a refund or a hotel. That risk is the reason these trips are cheap. The
+  app can tell you whether a later flight exists that day; it cannot rebook you.
+- **Estimated luggage.** Typical amounts, not quotes — real fees move with route,
+  season and how late the bag is added.
+- **Prices go stale.** Fares are cached for hours and can move within one.
+
 ## Manners, and the legal position
 
 This talks to Ryanair's own undocumented backend. There is no official public API, no
-key, and no developer portal — see [postman/API-REFERENCE.md](postman/API-REFERENCE.md)
-for what is live, what is gated, and what has been dead since 2020. Requests are capped
-at four concurrent with backoff, and the cache exists so the airline sees a fraction of
-the traffic.
+key, and no developer portal. Requests are capped at four concurrent with backoff, and
+the cache exists so the airline sees a fraction of the traffic.
 
 Ryanair has litigated aggressively against automated access to its fares. The endpoints
 are unauthenticated and the data is public, but the site terms prohibit automated
@@ -109,8 +135,9 @@ collection and resale. **This is personal tooling.** Turning it into a commercia
 product is a different question with a different answer — the honest paths there are a
 distribution agreement or a licensed aggregator feed.
 
-Not affiliated with, endorsed by, or connected to Ryanair. Fares shown are one adult
-with a cabin bag; bags, seats and other extras are not included.
+Not affiliated with, endorsed by, or connected to Ryanair. Fares shown are for one adult
+with a small bag under the seat. Luggage is estimated, not quoted; seats, priority and
+other extras are not included. Ryanair's own page is always the truth.
 
 ## Deploying
 

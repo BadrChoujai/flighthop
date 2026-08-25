@@ -1,8 +1,9 @@
 # Flighthop V1
 
-Self-connect flight search over the Ryanair network. It finds itineraries the airline
-does not sell: two separate tickets through a hub, joined only if the layover is one
-a person could actually make.
+Self-connect flight search over the Ryanair network — **and only Ryanair**. It finds
+itineraries the airline does not sell: separate tickets through one or more hubs,
+joined only if the layover is one a person could actually make. A connection exists
+here only if Ryanair flies every leg of it.
 
 ```bash
 node server.mjs
@@ -15,19 +16,26 @@ and uses Node's built-in SQLite for its cache. Node 22+ required (tested on 24.1
 
 - **Connect me** — origin, destination, date range. The destination accepts an
   airport code, a city, or a country (`TNG`, `Tangier`, `Morocco`, `ma`). Direct
-  flights are shown first when they exist; everything else is a one-stop
-  self-connection, ranked by fare plus the cost of the discomfort.
+  flights are shown first when they exist; everything else is a self-connection of up
+  to four tickets, ranked by fare plus luggage plus the cost of the discomfort.
 - **Anywhere under** — one upstream call ranks every destination out of an airport
   inside a budget, optionally filtered by country and departure time window.
 - **Month view** — best price per departure day for the whole itinerary, click a day
   to pin the results to it.
+- **Round trips** — paired one-way searches sharing one cache and one concurrency
+  gate, with the return leg only departing from airports the outbound actually reached.
+- **Luggage priced per booking** — every ticket is its own booking, so a bag is paid
+  once per flight. Choosing what you carry re-ranks in the browser and frequently
+  promotes a direct flight above a nominally cheaper connection. The fees are typical
+  amounts, not quotes; Ryanair exposes no fee endpoint.
 - **Filters re-rank instantly.** Only a new origin, destination or date range costs a
   round trip; the sliders operate on results already in the browser.
 
-The search bar lives in the header and swaps with the tab. Its two controls are
-hand-built in [public/components.js](public/components.js), because theming a picker
-library to this palette costs about as much CSS as writing one, and the app stays
-dependency-free and offline:
+The search controls sit above the results, with the filters in a rail beside them that
+becomes a sheet on a narrow screen. The two pickers are hand-built in
+[public/components.js](public/components.js), because theming a picker library to this
+palette costs about as much CSS as writing one, and the app stays dependency-free and
+offline:
 
 - **`PlacePicker`** searches code, city, airport name and country at once, ranks exact
   code matches first, and offers whole countries as first-class entries — "Morocco,
@@ -70,20 +78,25 @@ public/             the interface — vanilla, no build step
 |---|---|
 | `GET /api/search?from&to&dateFrom&dateTo&minLayover&maxLayover` | Server-sent events: `progress` per hub, then `result` |
 | `GET /api/explore?from&dateFrom&dateTo&maxPrice&country&after&before` | Ranked destinations |
+| `GET /api/getaway?from&outFrom&outTo&backFrom&backTo&weekends&…` | Round trips that fit a time window |
+| `GET /api/where` | Nearest airport from the request's geo headers |
 | `GET /api/airports` | Airport list for autocomplete |
 | `GET /api/health` | Cache size |
 
 ## Scoring
 
-`score = fare + 25 €/h under a 3h layover + 8 €/h over 8h + 60 € overnight + 30 € for
-a border crossing the trip did not already require`. The first two weights are sliders
-in the rail — "cost of a rushed transfer" and "cost of dead time" — so the ranking
-argues with the user rather than at them.
+`score = fare + luggage × flights + 25 €/h under a 3h layover + 8 €/h over 8h + 60 €
+overnight + 30 € for a border crossing the trip did not already require + 20 € per
+extra ticket`. The first two weights are sliders in the rail — "cost of a rushed
+transfer" and "cost of dead time" — so the ranking argues with the user rather than at
+them. Luggage multiplies by the number of flights, which is the term that stops a
+four-ticket itinerary looking cheaper than a direct one when it is not.
 
 ## Manners
 
-Concurrency is capped at 4 with backoff on 429 and 5xx. These are an airline's own
-undocumented endpoints, two of which already reject naive callers (see
-[../postman/API-REFERENCE.md](../postman/API-REFERENCE.md)). Ryanair has litigated
-against automated access to its fares; this is personal tooling, and turning it into a
-commercial product is a different question with a different answer.
+Concurrency is capped at 4 with backoff on 429 and 5xx, and everything is cached, so
+the airline sees a fraction of the traffic a naive client would generate. These are an
+airline's own undocumented endpoints and some of them already reject naive callers.
+Ryanair has litigated against automated access to its fares; this is personal tooling,
+and turning it into a commercial product is a different question with a different
+answer.
