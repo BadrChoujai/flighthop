@@ -75,7 +75,7 @@ export const cheapestPerDay = (from, to, month, currency = 'EUR') =>
  * Returns { "2026-09-09": [{ number, dep, arr }], … }
  */
 export const timetable = (from, to, month) =>
-  through(`timtbl:${from}:${to}:${month}`, TTL.routes, async () => {
+  through(`schedules:${from}:${to}:${month}`, TTL.routes, async () => {
     const [year, mon] = month.split('-');
     const data = await fetchJson(path('timetable', { from, to, year, month: Number(mon) }));
     const out = {};
